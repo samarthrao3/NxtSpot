@@ -1,5 +1,8 @@
+import uuid
+from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 VibeTag = Literal["Casual", "Date Night", "Hidden Gem", "Street Food"]
@@ -50,3 +53,20 @@ class PinUpdate(BaseModel):
     def validate_bbox(self) -> "PinUpdate":
         _assert_bangalore(self.lat, self.lng)
         return self
+
+
+class PinOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    influencer_id: uuid.UUID
+    restaurant_name: str
+    lat: float
+    lng: float
+    photos: list[str]
+    vibe_tag: VibeTag | None
+    price_range: PriceRange | None
+    must_order: str | None
+    note: str | None
+    rating: float | None
+    created_at: datetime

@@ -68,7 +68,7 @@ export const pinsApi = {
     apiFetch<Pin>('/pins', { method: 'POST', body: JSON.stringify(data), token }),
 
   update: (id: string, data: Partial<Omit<Pin, 'id' | 'influencer_id' | 'created_at'>>, token: string) =>
-    apiFetch<Pin>(`/pins/${id}`, { method: 'PUT', body: JSON.stringify(data), token }),
+    apiFetch<Pin>(`/pins/${id}`, { method: 'PATCH', body: JSON.stringify(data), token }),
 
   delete: (id: string, token: string) =>
     apiFetch<void>(`/pins/${id}`, { method: 'DELETE', token }),

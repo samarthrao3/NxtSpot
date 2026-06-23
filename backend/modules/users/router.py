@@ -7,8 +7,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from models import User, Pin, SavedPin
 from modules.auth.deps import get_current_user
+from modules.auth.schemas import UserOut
+from .schemas import UserUpdateIn
 
 router = APIRouter()
+
+
+@router.get("/me", response_model=UserOut, summary="Get current user profile")
+async def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
+    return UserOut.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserOut, summary="Update name and/or avatar_url")
+async def update_me(
+    body: UserUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserOut:
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(current_user, field, value)
+    await db.commit()
+    await db.refresh(current_user)
+    return UserOut.model_validate(current_user)
 
 
 @router.get("/saved")
