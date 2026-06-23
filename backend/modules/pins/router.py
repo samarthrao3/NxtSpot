@@ -8,23 +8,23 @@ from core.database import get_db
 from core.redis import get_redis
 from models import Pin, Subscription, User
 from modules.auth.deps import get_current_user
-from .schemas import PinCreate, PinUpdate
+from .schemas import PinCreate, PinOut, PinUpdate
 
 router = APIRouter()
 
 
-@router.get("/influencer/{influencer_id}", summary="Public pin list for an influencer")
-async def get_influencer_pins(influencer_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/influencer/{influencer_id}", response_model=list[PinOut], summary="Public pin list for an influencer")
+async def get_influencer_pins(influencer_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> list[PinOut]:
     result = await db.execute(select(Pin).where(Pin.influencer_id == influencer_id))
-    return result.scalars().all()
+    return [PinOut.model_validate(p) for p in result.scalars().all()]
 
 
-@router.post("/", status_code=201)
+@router.post("/", response_model=PinOut, status_code=201)
 async def create_pin(
     body: PinCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> PinOut:
     if current_user.role != "influencer":
         raise HTTPException(status_code=403, detail="Only influencers can create pins")
     pin = Pin(influencer_id=current_user.id, **body.model_dump())
@@ -32,23 +32,23 @@ async def create_pin(
     await db.commit()
     await db.refresh(pin)
     await _invalidate_follower_feeds(current_user.id, db)
-    return pin
+    return PinOut.model_validate(pin)
 
 
-@router.put("/{pin_id}")
+@router.patch("/{pin_id}", response_model=PinOut)
 async def update_pin(
     pin_id: uuid.UUID,
     body: PinUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> PinOut:
     pin = await _get_own_pin(pin_id, current_user, db)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(pin, field, value)
     await db.commit()
     await db.refresh(pin)
     await _invalidate_follower_feeds(current_user.id, db)
-    return pin
+    return PinOut.model_validate(pin)
 
 
 @router.delete("/{pin_id}", status_code=204)

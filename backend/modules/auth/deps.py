@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,6 +12,17 @@ from core.database import get_db
 from models import User
 
 security = HTTPBearer()
+
+ACCESS_TOKEN_EXPIRES = timedelta(days=7)
+
+
+def create_access_token(user_id: uuid.UUID, role: str) -> str:
+    payload = {
+        "sub": str(user_id),
+        "role": role,
+        "exp": datetime.now(timezone.utc) + ACCESS_TOKEN_EXPIRES,
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
 async def get_current_user(

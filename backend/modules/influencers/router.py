@@ -47,9 +47,11 @@ async def get_influencer(handle: str, db: AsyncSession = Depends(get_db)):
     return data
 
 
-@router.get("/", summary="List all influencers (auth required)")
+@router.get("/", summary="List all influencers")
 async def list_influencers(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.role == "influencer"))
+    result = await db.execute(
+        select(User).where(User.role == "influencer").order_by(User.created_at.desc())
+    )
     users = result.scalars().all()
     out = []
     for u in users:
