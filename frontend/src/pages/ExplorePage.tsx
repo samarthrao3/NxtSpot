@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, getAccessToken } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
+import { getAppToken } from '@/lib/auth'
 import { useSession } from '@/lib/useSession'
 import { influencersApi, subscriptionsApi, type Influencer } from '@/lib/api'
 import { TopNavBar } from '@/components/ui/TopNavBar'
@@ -19,8 +20,8 @@ export function ExplorePage() {
   const { data: following } = useQuery({
     queryKey: ['following'],
     queryFn: async () => {
-      const token = await getAccessToken()
-      return subscriptionsApi.getFollowing(token!)
+      const token = await getAppToken()
+      return subscriptionsApi.getFollowing(token)
     },
     enabled: !!session,
   })
@@ -28,15 +29,15 @@ export function ExplorePage() {
 
   const follow = useMutation({
     mutationFn: async (influencerId: string) => {
-      const token = await getAccessToken()
-      return subscriptionsApi.follow(influencerId, token!)
+      const token = await getAppToken()
+      return subscriptionsApi.follow(influencerId, token)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['following'] }),
   })
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
-      const token = await getAccessToken()
-      return subscriptionsApi.unfollow(influencerId, token!)
+      const token = await getAppToken()
+      return subscriptionsApi.unfollow(influencerId, token)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['following'] }),
   })

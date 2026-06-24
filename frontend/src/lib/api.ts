@@ -14,7 +14,11 @@ async function apiFetch<T>(
   const res = await fetch(`${API_URL}${path}`, { ...rest, headers })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(body.detail ?? res.statusText)
+    const detail = body.detail
+    const message = Array.isArray(detail)
+      ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join('; ')
+      : detail
+    throw new Error(message || res.statusText)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -58,6 +62,18 @@ export interface UserProfile {
   avatar_url: string | null
 }
 
+// ---------- Auth ----------
+
+export const authApi = {
+  login: (supabaseAccessToken: string) =>
+    apiFetch<{ access_token: string; user: UserProfile }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ access_token: supabaseAccessToken }),
+    }),
+
+  me: (token: string) => apiFetch<UserProfile>('/auth/me', { token }),
+}
+
 // ---------- Pins ----------
 
 export const pinsApi = {
@@ -85,8 +101,13 @@ export const influencersApi = {
 
 // ---------- Feed ----------
 
+export interface FeedGroup {
+  influencer_id: string
+  pins: Pin[]
+}
+
 export const feedApi = {
-  get: (token: string) => apiFetch<Pin[]>('/feed', { token }),
+  get: (token: string) => apiFetch<FeedGroup[]>('/feed', { token }),
 }
 
 // ---------- Subscriptions ----------
@@ -106,19 +127,19 @@ export const subscriptionsApi = {
 
 export const savedPinsApi = {
   save: (pinId: string, token: string) =>
-    apiFetch<void>(`/users/saved/${pinId}`, { method: 'POST', token }),
+    apiFetch<void>(`/users/me/saved/${pinId}`, { method: 'POST', token }),
 
   unsave: (pinId: string, token: string) =>
-    apiFetch<void>(`/users/saved/${pinId}`, { method: 'DELETE', token }),
+    apiFetch<void>(`/users/me/saved/${pinId}`, { method: 'DELETE', token }),
 
-  getAll: (token: string) => apiFetch<Pin[]>('/users/saved', { token }),
+  getAll: (token: string) => apiFetch<Pin[]>('/users/me/saved', { token }),
 }
 
 // ---------- Media ----------
 
 export const mediaApi = {
   getPresignedUrl: (filename: string, token: string) =>
-    apiFetch<{ url: string; public_url: string }>('/media/presigned-url', {
+    apiFetch<{ url: string; public_url: string; content_type: string }>('/media/presigned-url', {
       method: 'POST',
       body: JSON.stringify({ filename }),
       token,

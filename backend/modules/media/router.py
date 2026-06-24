@@ -43,7 +43,8 @@ async def get_presigned_url(
     if res.status_code != 200:
         raise HTTPException(status_code=502, detail="Failed to generate upload URL")
 
-    signed_url: str = res.json()["signedURL"]
+    relative_url: str = res.json()["url"]
+    signed_url = f"{settings.supabase_url}/storage/v1{relative_url}"
     public_url = f"{settings.supabase_url}/storage/v1/object/public/photos/{object_path}"
 
     return {"url": signed_url, "public_url": public_url, "content_type": content_type}

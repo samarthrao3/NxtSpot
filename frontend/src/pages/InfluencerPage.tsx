@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { MAPBOX_TOKEN, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
 import { influencersApi, pinsApi, savedPinsApi, type Pin } from '@/lib/api'
-import { getAccessToken, supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
+import { getAppToken } from '@/lib/auth'
 import { useSession } from '@/lib/useSession'
 import { Icon } from '@/components/ui/Icon'
 import { TopNavBar } from '@/components/ui/TopNavBar'
@@ -37,8 +38,8 @@ export function InfluencerPage() {
   const { data: savedPins } = useQuery({
     queryKey: ['saved-pins'],
     queryFn: async () => {
-      const token = await getAccessToken()
-      return savedPinsApi.getAll(token!)
+      const token = await getAppToken()
+      return savedPinsApi.getAll(token)
     },
     enabled: !!session,
   })
@@ -46,15 +47,15 @@ export function InfluencerPage() {
 
   const save = useMutation({
     mutationFn: async (pinId: string) => {
-      const token = await getAccessToken()
-      return savedPinsApi.save(pinId, token!)
+      const token = await getAppToken()
+      return savedPinsApi.save(pinId, token)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
   const unsave = useMutation({
     mutationFn: async (pinId: string) => {
-      const token = await getAccessToken()
-      return savedPinsApi.unsave(pinId, token!)
+      const token = await getAppToken()
+      return savedPinsApi.unsave(pinId, token)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
@@ -85,7 +86,7 @@ export function InfluencerPage() {
       map.current?.remove()
       map.current = null
     }
-  }, [])
+  }, [loadingProfile])
 
   // Drop markers when pins load
   useEffect(() => {
