@@ -106,12 +106,12 @@ export const subscriptionsApi = {
 
 export const savedPinsApi = {
   save: (pinId: string, token: string) =>
-    apiFetch<void>(`/users/saved/${pinId}`, { method: 'POST', token }),
+    apiFetch<void>(`/users/me/saved/${pinId}`, { method: 'POST', token }),
 
   unsave: (pinId: string, token: string) =>
-    apiFetch<void>(`/users/saved/${pinId}`, { method: 'DELETE', token }),
+    apiFetch<void>(`/users/me/saved/${pinId}`, { method: 'DELETE', token }),
 
-  getAll: (token: string) => apiFetch<Pin[]>('/users/saved', { token }),
+  getAll: (token: string) => apiFetch<Pin[]>('/users/me/saved', { token }),
 }
 
 // ---------- Media ----------
