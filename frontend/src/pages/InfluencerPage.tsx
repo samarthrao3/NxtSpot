@@ -86,7 +86,7 @@ export function InfluencerPage() {
       map.current?.remove()
       map.current = null
     }
-  }, [])
+  }, [loadingProfile])
 
   // Drop markers when pins load
   useEffect(() => {
