@@ -7,7 +7,12 @@ const items = [
   { to: '/saved', label: 'Saved', icon: 'bookmark' },
 ]
 
-export function SideNavBar({ children }: { children?: React.ReactNode }) {
+interface Props {
+  children?: React.ReactNode
+  onAddPin?: () => void
+}
+
+export function SideNavBar({ children, onAddPin }: Props) {
   const { pathname } = useLocation()
 
   return (
@@ -49,12 +54,17 @@ export function SideNavBar({ children }: { children?: React.ReactNode }) {
         <div className="flex-1" />
       )}
 
-      <div className="px-6 pt-4 mt-auto pb-4">
-        <button className="w-full py-2 px-4 border border-outline text-on-surface font-label-caps text-label-caps uppercase tracking-wider hover:bg-surface-container transition-colors flex items-center justify-center gap-2">
-          <Icon name="add" className="text-[16px]" />
-          Add Pin
-        </button>
-      </div>
+      {onAddPin && (
+        <div className="px-6 pt-4 mt-auto pb-4">
+          <button
+            onClick={onAddPin}
+            className="w-full py-2 px-4 border border-outline text-on-surface font-label-caps text-label-caps uppercase tracking-wider hover:bg-surface-container transition-colors flex items-center justify-center gap-2"
+          >
+            <Icon name="add" className="text-[16px]" />
+            Add Pin
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
-import { MAPBOX_TOKEN, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
+import { SearchBox } from '@mapbox/search-js-react'
+import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
 import { feedApi, influencersApi, subscriptionsApi } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase'
+import { getAppToken } from '@/lib/auth'
+import { useCurrentUser } from '@/lib/useCurrentUser'
 import { colorForId } from '@/lib/colors'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { SideNavBar } from '@/components/ui/SideNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
 import { Spinner } from '@/components/ui/Spinner'
+import { PinFormModal } from '@/components/pins/PinFormModal'
 
 mapboxgl.accessToken = MAPBOX_TOKEN
 
@@ -16,21 +19,29 @@ export function MapPage() {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markers = useRef<mapboxgl.Marker[]>([])
+  const [mapReady, setMapReady] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  const [addPinMode, setAddPinMode] = useState(false)
+  const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [pickError, setPickError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const { data: pins, isLoading } = useQuery({
+  const { data: currentUser } = useCurrentUser()
+
+  const { data: feedGroups, isLoading } = useQuery({
     queryKey: ['feed'],
     queryFn: async () => {
-      const token = await getAccessToken()
-      return feedApi.get(token!)
+      const token = await getAppToken()
+      return feedApi.get(token)
     },
   })
+  const pins = useMemo(() => feedGroups?.flatMap((group) => group.pins), [feedGroups])
 
   const { data: following } = useQuery({
     queryKey: ['following'],
     queryFn: async () => {
-      const token = await getAccessToken()
-      return subscriptionsApi.getFollowing(token!)
+      const token = await getAppToken()
+      return subscriptionsApi.getFollowing(token)
     },
   })
 
@@ -52,9 +63,11 @@ export function MapPage() {
       zoom: BANGALORE_DEFAULT_ZOOM,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
+    setMapReady(true)
     return () => {
       map.current?.remove()
       map.current = null
+      setMapReady(false)
     }
   }, [])
 
@@ -95,6 +108,35 @@ export function MapPage() {
       })
   }, [pins, hiddenIds])
 
+  // While picking a pin location: crosshair cursor, capture the next map click
+  useEffect(() => {
+    if (!map.current || !addPinMode) return
+    const canvas = map.current.getCanvas()
+    canvas.style.cursor = 'crosshair'
+
+    const handleClick = (e: mapboxgl.MapMouseEvent) => {
+      const { lat, lng } = e.lngLat
+      if (
+        lat < BANGALORE_BBOX.lat.min ||
+        lat > BANGALORE_BBOX.lat.max ||
+        lng < BANGALORE_BBOX.lng.min ||
+        lng > BANGALORE_BBOX.lng.max
+      ) {
+        setPickError('Please pick a location within Bangalore.')
+        return
+      }
+      setPickError(null)
+      setAddPinMode(false)
+      setPendingLocation({ lat, lng })
+    }
+
+    map.current.on('click', handleClick)
+    return () => {
+      canvas.style.cursor = ''
+      map.current?.off('click', handleClick)
+    }
+  }, [addPinMode])
+
   const toggleVisible = (influencerId: string) => {
     setHiddenIds((prev) => {
       const next = new Set(prev)
@@ -108,7 +150,16 @@ export function MapPage() {
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <TopNavBar />
       <div className="flex flex-1 mt-12 relative">
-        <SideNavBar>
+        <SideNavBar
+          onAddPin={
+            currentUser?.role === 'influencer'
+              ? () => {
+                  setPickError(null)
+                  setAddPinMode(true)
+                }
+              : undefined
+          }
+        >
           <div className="px-4 py-3 font-label-caps text-label-caps text-secondary uppercase">
             Followed Curators
           </div>
@@ -155,6 +206,22 @@ export function MapPage() {
 
         <main className="flex-1 w-full md:ml-[220px] relative">
           <div ref={mapContainer} className="absolute inset-0" />
+
+          {addPinMode && mapReady && map.current && (
+            <div className="absolute top-4 left-4 z-30 w-72">
+              <SearchBox
+                accessToken={MAPBOX_TOKEN}
+                map={map.current}
+                mapboxgl={mapboxgl}
+                options={{
+                  bbox: [BANGALORE_BBOX.lng.min, BANGALORE_BBOX.lat.min, BANGALORE_BBOX.lng.max, BANGALORE_BBOX.lat.max],
+                  proximity: BANGALORE_CENTER,
+                }}
+                placeholder="Search for a location in Bangalore"
+              />
+            </div>
+          )}
+
           {isLoading && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-surface border border-outline-variant px-4 py-2 flex items-center gap-2 font-body-base text-body-base text-secondary">
               <Spinner size={4} />
@@ -166,9 +233,44 @@ export function MapPage() {
               Follow some influencers on Discover to see their pins here
             </div>
           )}
+
+          {addPinMode && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-outline-variant px-4 py-2 flex items-center gap-3 font-body-base text-body-base text-on-surface">
+              Click a location on the map to place your pin
+              <button
+                onClick={() => setAddPinMode(false)}
+                className="font-label-caps text-label-caps text-secondary hover:text-primary uppercase"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {pickError && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-surface border border-red-300 text-red-600 px-4 py-2 font-body-base text-body-base">
+              {pickError}
+            </div>
+          )}
+          {successMessage && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-primary text-primary px-4 py-2 font-body-base text-body-base">
+              {successMessage}
+            </div>
+          )}
         </main>
       </div>
       <BottomNavBar />
+
+      {pendingLocation && (
+        <PinFormModal
+          lat={pendingLocation.lat}
+          lng={pendingLocation.lng}
+          onClose={() => setPendingLocation(null)}
+          onSuccess={() => {
+            setPendingLocation(null)
+            setSuccessMessage('Pin saved!')
+            setTimeout(() => setSuccessMessage(null), 3000)
+          }}
+        />
+      )}
     </div>
   )
 }

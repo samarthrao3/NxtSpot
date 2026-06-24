@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { savedPinsApi } from '@/lib/api'
-import { getAccessToken } from '@/lib/supabase'
+import { getAppToken } from '@/lib/auth'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { SideNavBar } from '@/components/ui/SideNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
@@ -13,15 +13,15 @@ export function SavedPage() {
   const { data: pins, isLoading } = useQuery({
     queryKey: ['saved-pins'],
     queryFn: async () => {
-      const token = await getAccessToken()
-      return savedPinsApi.getAll(token!)
+      const token = await getAppToken()
+      return savedPinsApi.getAll(token)
     },
   })
 
   const unsave = useMutation({
     mutationFn: async (pinId: string) => {
-      const token = await getAccessToken()
-      return savedPinsApi.unsave(pinId, token!)
+      const token = await getAppToken()
+      return savedPinsApi.unsave(pinId, token)
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
