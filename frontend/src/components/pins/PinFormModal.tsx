@@ -11,13 +11,14 @@ const PRICE_RANGES: PriceRange[] = ['₹', '₹₹', '₹₹₹']
 interface Props {
   lat: number
   lng: number
+  initialName?: string
   onClose: () => void
   onSuccess: () => void
 }
 
-export function PinFormModal({ lat, lng, onClose, onSuccess }: Props) {
+export function PinFormModal({ lat, lng, initialName, onClose, onSuccess }: Props) {
   const qc = useQueryClient()
-  const [restaurantName, setRestaurantName] = useState('')
+  const [restaurantName, setRestaurantName] = useState(initialName ?? '')
   const [vibeTag, setVibeTag] = useState<VibeTag | ''>('')
   const [priceRange, setPriceRange] = useState<PriceRange | ''>('')
   const [mustOrder, setMustOrder] = useState('')

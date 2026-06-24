@@ -22,7 +22,7 @@ export function MapPage() {
   const [mapReady, setMapReady] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [addPinMode, setAddPinMode] = useState(false)
-  const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number; name?: string } | null>(null)
   const [pickError, setPickError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
@@ -108,6 +108,21 @@ export function MapPage() {
       })
   }, [pins, hiddenIds])
 
+  const tryPlaceLocation = (lat: number, lng: number, name?: string) => {
+    if (
+      lat < BANGALORE_BBOX.lat.min ||
+      lat > BANGALORE_BBOX.lat.max ||
+      lng < BANGALORE_BBOX.lng.min ||
+      lng > BANGALORE_BBOX.lng.max
+    ) {
+      setPickError('Please pick a location within Bangalore.')
+      return
+    }
+    setPickError(null)
+    setAddPinMode(false)
+    setPendingLocation({ lat, lng, name })
+  }
+
   // While picking a pin location: crosshair cursor, capture the next map click
   useEffect(() => {
     if (!map.current || !addPinMode) return
@@ -115,19 +130,7 @@ export function MapPage() {
     canvas.style.cursor = 'crosshair'
 
     const handleClick = (e: mapboxgl.MapMouseEvent) => {
-      const { lat, lng } = e.lngLat
-      if (
-        lat < BANGALORE_BBOX.lat.min ||
-        lat > BANGALORE_BBOX.lat.max ||
-        lng < BANGALORE_BBOX.lng.min ||
-        lng > BANGALORE_BBOX.lng.max
-      ) {
-        setPickError('Please pick a location within Bangalore.')
-        return
-      }
-      setPickError(null)
-      setAddPinMode(false)
-      setPendingLocation({ lat, lng })
+      tryPlaceLocation(e.lngLat.lat, e.lngLat.lng)
     }
 
     map.current.on('click', handleClick)
@@ -218,6 +221,12 @@ export function MapPage() {
                   proximity: BANGALORE_CENTER,
                 }}
                 placeholder="Search for a location in Bangalore"
+                onRetrieve={(res) => {
+                  const feature = res.features[0]
+                  if (!feature) return
+                  const { latitude, longitude } = feature.properties.coordinates
+                  tryPlaceLocation(latitude, longitude, feature.properties.name)
+                }}
               />
             </div>
           )}
@@ -263,6 +272,7 @@ export function MapPage() {
         <PinFormModal
           lat={pendingLocation.lat}
           lng={pendingLocation.lng}
+          initialName={pendingLocation.name}
           onClose={() => setPendingLocation(null)}
           onSuccess={() => {
             setPendingLocation(null)
