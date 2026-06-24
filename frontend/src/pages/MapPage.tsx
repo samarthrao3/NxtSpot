@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
 import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
-import { feedApi, influencersApi, savedPinsApi, subscriptionsApi, type Pin } from '@/lib/api'
+import { feedApi, influencersApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { useCurrentUser } from '@/lib/useCurrentUser'
 import { colorForId } from '@/lib/colors'
@@ -18,6 +19,9 @@ mapboxgl.accessToken = MAPBOX_TOKEN
 
 export function MapPage() {
   const qc = useQueryClient()
+  const location = useLocation()
+  const focusPin = (location.state as { focusPin?: Pin } | null)?.focusPin
+  const lastFocusedId = useRef<string | null>(null)
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markers = useRef<mapboxgl.Marker[]>([])
@@ -29,8 +33,15 @@ export function MapPage() {
   const [pickError, setPickError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
+  const [editingPin, setEditingPin] = useState<Pin | null>(null)
+  const [confirmingDeletePin, setConfirmingDeletePin] = useState(false)
 
   const { data: currentUser } = useCurrentUser()
+  const isOwnPin = !!selectedPin && currentUser?.role === 'influencer' && selectedPin.influencer_id === currentUser.id
+
+  useEffect(() => {
+    setConfirmingDeletePin(false)
+  }, [selectedPin?.id])
 
   const { data: savedPins } = useQuery({
     queryKey: ['saved-pins'],
@@ -60,6 +71,21 @@ export function MapPage() {
     else save.mutate(pinId)
   }
 
+  const deletePin = useMutation({
+    mutationFn: async (pinId: string) => {
+      const token = await getAppToken()
+      return pinsApi.delete(pinId, token)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['feed'] })
+      qc.invalidateQueries({ queryKey: ['pins'] })
+      setSelectedPin(null)
+      setConfirmingDeletePin(false)
+      setSuccessMessage('Pin deleted')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    },
+  })
+
   const { data: feedGroups, isLoading } = useQuery({
     queryKey: ['feed'],
     queryFn: async () => {
@@ -68,6 +94,24 @@ export function MapPage() {
     },
   })
   const pins = useMemo(() => feedGroups?.flatMap((group) => group.pins), [feedGroups])
+
+  const { data: ownPins } = useQuery({
+    queryKey: ['pins', 'influencer', currentUser?.id],
+    queryFn: () => pinsApi.getByInfluencer(currentUser!.id),
+    enabled: currentUser?.role === 'influencer',
+  })
+
+  // Adds the influencer's own pins, plus a saved pin we've been asked to focus on
+  // even if its influencer isn't followed
+  const markerPins = useMemo(() => {
+    const result = [...(pins ?? [])]
+    const addIfMissing = (p?: Pin) => {
+      if (p && !result.some((r) => r.id === p.id)) result.push(p)
+    }
+    ownPins?.forEach(addIfMissing)
+    addIfMissing(focusPin)
+    return result
+  }, [pins, ownPins, focusPin])
 
   const { data: following } = useQuery({
     queryKey: ['following'],
@@ -103,15 +147,24 @@ export function MapPage() {
     }
   }, [])
 
+  // Fly to and open details for a pin we were sent here to focus on (e.g. from Saved)
+  useEffect(() => {
+    if (!mapReady || !map.current || !focusPin) return
+    if (lastFocusedId.current === focusPin.id) return
+    lastFocusedId.current = focusPin.id
+    map.current.flyTo({ center: [focusPin.lng, focusPin.lat], zoom: 16, duration: 1200 })
+    setSelectedPin(focusPin)
+  }, [mapReady, focusPin])
+
   // Drop markers when pins/visibility change
   useEffect(() => {
-    if (!map.current || !pins) return
+    if (!map.current || !markerPins) return
     markers.current.forEach((m) => m.remove())
     markers.current = []
     popups.current.forEach((p) => p.remove())
     popups.current = []
 
-    pins
+    markerPins
       .filter((pin) => !hiddenIds.has(pin.influencer_id))
       .forEach((pin) => {
         const color = colorForId(pin.influencer_id)
@@ -209,7 +262,7 @@ export function MapPage() {
           .addTo(map.current!)
         markers.current.push(marker)
       })
-  }, [pins, hiddenIds, allInfluencers])
+  }, [markerPins, hiddenIds, allInfluencers])
 
   const tryPlaceLocation = (lat: number, lng: number, name?: string) => {
     if (
@@ -266,6 +319,38 @@ export function MapPage() {
               : undefined
           }
         >
+          {currentUser?.role === 'influencer' && (
+            <>
+              <div className="px-4 py-3 font-label-caps text-label-caps text-secondary uppercase">My Pins</div>
+              <div
+                className="flex items-center justify-between px-4 py-3 border-b border-outline-variant hover:bg-surface-container-low cursor-pointer"
+                onClick={() => toggleVisible(currentUser.id)}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: colorForId(currentUser.id) }}
+                  />
+                  <span className="font-body-base text-body-base text-on-surface truncate">
+                    @{currentUser.handle}
+                  </span>
+                </div>
+                <label
+                  className="relative inline-flex items-center cursor-pointer shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={!hiddenIds.has(currentUser.id)}
+                    onChange={() => toggleVisible(currentUser.id)}
+                  />
+                  <div className="w-7 h-4 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary border border-outline-variant" />
+                </label>
+              </div>
+            </>
+          )}
+
           <div className="px-4 py-3 font-label-caps text-label-caps text-secondary uppercase">
             Followed Curators
           </div>
@@ -377,14 +462,23 @@ export function MapPage() {
                 >
                   <Icon name="close" />
                 </button>
-                <button
-                  onClick={() => handleSaveToggle(selectedPin.id)}
-                  className={`transition-colors ${
-                    savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
-                  }`}
-                >
-                  <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
-                </button>
+                {isOwnPin ? (
+                  <button
+                    onClick={() => setEditingPin(selectedPin)}
+                    className="text-on-surface-variant hover:text-primary transition-colors"
+                  >
+                    <Icon name="edit" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSaveToggle(selectedPin.id)}
+                    className={`transition-colors ${
+                      savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
+                    }`}
+                  >
+                    <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
+                  </button>
+                )}
               </div>
 
               <div className="p-4 flex flex-col flex-1">
@@ -438,7 +532,7 @@ export function MapPage() {
                     </p>
                   )}
 
-                  <div className="mt-auto pt-6 border-t border-outline-variant">
+                  <div className="mt-auto pt-6 border-t border-outline-variant flex flex-col gap-3">
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
                       target="_blank"
@@ -448,6 +542,40 @@ export function MapPage() {
                       <Icon name="directions" className="text-[18px]" />
                       GET DIRECTIONS
                     </a>
+
+                    {isOwnPin && !confirmingDeletePin && (
+                      <button
+                        onClick={() => setConfirmingDeletePin(true)}
+                        className="w-full py-3 border border-red-300 text-red-600 font-label-caps text-label-caps uppercase tracking-wider hover:bg-red-50 transition-colors"
+                      >
+                        Delete Pin
+                      </button>
+                    )}
+                    {isOwnPin && confirmingDeletePin && (
+                      <div className="flex flex-col gap-2">
+                        <p className="font-body-sm text-body-sm text-on-surface">
+                          Delete this pin? This cannot be undone.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => deletePin.mutate(selectedPin.id)}
+                            disabled={deletePin.isPending}
+                            className="flex-1 py-2 bg-red-600 text-white font-label-caps text-label-caps uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50"
+                          >
+                            {deletePin.isPending ? 'Deleting…' : 'Yes, delete'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmingDeletePin(false)}
+                            className="flex-1 py-2 border border-outline-variant font-label-caps text-label-caps uppercase tracking-wider text-on-surface hover:bg-surface-container transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {deletePin.isError && (
+                          <p className="font-body-sm text-body-sm text-red-600">Could not delete pin. Try again.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -466,6 +594,21 @@ export function MapPage() {
           onSuccess={() => {
             setPendingLocation(null)
             setSuccessMessage('Pin saved!')
+            setTimeout(() => setSuccessMessage(null), 3000)
+          }}
+        />
+      )}
+
+      {editingPin && (
+        <PinFormModal
+          lat={editingPin.lat}
+          lng={editingPin.lng}
+          pin={editingPin}
+          onClose={() => setEditingPin(null)}
+          onSuccess={() => {
+            setEditingPin(null)
+            setSelectedPin(null)
+            setSuccessMessage('Pin updated!')
             setTimeout(() => setSuccessMessage(null), 3000)
           }}
         />

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getAppToken } from '@/lib/auth'
 import { useSession } from '@/lib/useSession'
+import { useCurrentUser } from '@/lib/useCurrentUser'
 import { influencersApi, subscriptionsApi, type Influencer } from '@/lib/api'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
@@ -11,11 +12,13 @@ import { Spinner } from '@/components/ui/Spinner'
 export function ExplorePage() {
   const session = useSession()
   const qc = useQueryClient()
+  const { data: currentUser } = useCurrentUser()
 
   const { data: influencers, isLoading } = useQuery({
     queryKey: ['influencers'],
     queryFn: influencersApi.getAll,
   })
+  const visibleInfluencers = influencers?.filter((inf) => inf.id !== currentUser?.id)
 
   const { data: following } = useQuery({
     queryKey: ['following'],
@@ -32,14 +35,20 @@ export function ExplorePage() {
       const token = await getAppToken()
       return subscriptionsApi.follow(influencerId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['following'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['feed'] })
+    },
   })
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
       const token = await getAppToken()
       return subscriptionsApi.unfollow(influencerId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['following'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['feed'] })
+    },
   })
 
   const handleFollowClick = (influencerId: string) => {
@@ -75,11 +84,11 @@ export function ExplorePage() {
           <div className="flex justify-center py-16">
             <Spinner />
           </div>
-        ) : !influencers?.length ? (
+        ) : !visibleInfluencers?.length ? (
           <p className="text-secondary font-body-base text-body-base">No influencers yet.</p>
         ) : (
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-            {influencers.map((inf) => (
+            {visibleInfluencers.map((inf) => (
               <InfluencerCard
                 key={inf.id}
                 influencer={inf}

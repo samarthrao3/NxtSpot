@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { mediaApi, pinsApi, type PriceRange, type VibeTag } from '@/lib/api'
+import { mediaApi, pinsApi, type Pin, type PriceRange, type VibeTag } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
@@ -12,19 +12,21 @@ interface Props {
   lat: number
   lng: number
   initialName?: string
+  pin?: Pin
   onClose: () => void
   onSuccess: () => void
 }
 
-export function PinFormModal({ lat, lng, initialName, onClose, onSuccess }: Props) {
+export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }: Props) {
+  const isEditing = !!pin
   const qc = useQueryClient()
-  const [restaurantName, setRestaurantName] = useState(initialName ?? '')
-  const [vibeTag, setVibeTag] = useState<VibeTag | ''>('')
-  const [priceRange, setPriceRange] = useState<PriceRange | ''>('')
-  const [mustOrder, setMustOrder] = useState('')
-  const [note, setNote] = useState('')
-  const [rating, setRating] = useState('')
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [restaurantName, setRestaurantName] = useState(pin?.restaurant_name ?? initialName ?? '')
+  const [vibeTag, setVibeTag] = useState<VibeTag | ''>(pin?.vibe_tag ?? '')
+  const [priceRange, setPriceRange] = useState<PriceRange | ''>(pin?.price_range ?? '')
+  const [mustOrder, setMustOrder] = useState(pin?.must_order ?? '')
+  const [note, setNote] = useState(pin?.note ?? '')
+  const [rating, setRating] = useState(pin?.rating ? String(pin.rating) : '')
+  const [photoUrl, setPhotoUrl] = useState<string | null>(pin?.photos[0] ?? null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
@@ -44,37 +46,36 @@ export function PinFormModal({ lat, lng, initialName, onClose, onSuccess }: Prop
     }
   }
 
-  const create = useMutation({
+  const submit = useMutation({
     mutationFn: async () => {
       const token = await getAppToken()
-      return pinsApi.create(
-        {
-          restaurant_name: restaurantName,
-          lat,
-          lng,
-          photos: photoUrl ? [photoUrl] : [],
-          vibe_tag: vibeTag || null,
-          price_range: priceRange || null,
-          must_order: mustOrder || null,
-          note: note || null,
-          rating: rating ? Number(rating) : null,
-        },
-        token,
-      )
+      const data = {
+        restaurant_name: restaurantName,
+        lat,
+        lng,
+        photos: photoUrl ? [photoUrl] : [],
+        vibe_tag: vibeTag || null,
+        price_range: priceRange || null,
+        must_order: mustOrder || null,
+        note: note || null,
+        rating: rating ? Number(rating) : null,
+      }
+      return isEditing ? pinsApi.update(pin!.id, data, token) : pinsApi.create(data, token)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pins'] })
+      qc.invalidateQueries({ queryKey: ['feed'] })
       onSuccess()
     },
   })
 
-  const canSubmit = restaurantName.trim().length > 0 && !uploading && !create.isPending
+  const canSubmit = restaurantName.trim().length > 0 && !uploading && !submit.isPending
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-surface border border-outline-variant w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-surface z-10 flex justify-between items-center p-4 border-b border-outline-variant">
-          <h2 className="font-headline-sm text-headline-sm text-on-surface">Add a Pin</h2>
+          <h2 className="font-headline-sm text-headline-sm text-on-surface">{isEditing ? 'Edit Pin' : 'Add a Pin'}</h2>
           <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition-colors">
             <Icon name="close" />
           </button>
@@ -83,7 +84,7 @@ export function PinFormModal({ lat, lng, initialName, onClose, onSuccess }: Prop
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            create.mutate()
+            submit.mutate()
           }}
           className="p-4 flex flex-col gap-4"
         >
@@ -191,9 +192,9 @@ export function PinFormModal({ lat, lng, initialName, onClose, onSuccess }: Prop
             )}
           </label>
 
-          {create.isError && (
+          {submit.isError && (
             <p className="font-body-sm text-body-sm text-red-600">
-              {create.error instanceof Error ? create.error.message : 'Could not create pin.'}
+              {submit.error instanceof Error ? submit.error.message : 'Could not save pin.'}
             </p>
           )}
 
@@ -202,7 +203,7 @@ export function PinFormModal({ lat, lng, initialName, onClose, onSuccess }: Prop
             disabled={!canSubmit}
             className="w-full py-3 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors border border-[#1A1A1A] disabled:opacity-50"
           >
-            {create.isPending ? 'Saving…' : 'Save Pin'}
+            {submit.isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Pin'}
           </button>
         </form>
       </div>
