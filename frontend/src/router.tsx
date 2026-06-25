@@ -3,6 +3,7 @@ import { ExplorePage } from '@/pages/ExplorePage'
 import { InfluencerPage } from '@/pages/InfluencerPage'
 import { MapPage } from '@/pages/MapPage'
 import { SavedPage } from '@/pages/SavedPage'
+import { FollowingPage } from '@/pages/FollowingPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { ProtectedRoute } from '@/components/ui/ProtectedRoute'
 
@@ -26,6 +27,14 @@ export function AppRouter() {
           element={
             <ProtectedRoute>
               <SavedPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/following"
+          element={
+            <ProtectedRoute>
+              <FollowingPage />
             </ProtectedRoute>
           }
         />

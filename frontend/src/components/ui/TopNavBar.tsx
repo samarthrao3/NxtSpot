@@ -7,6 +7,7 @@ import { Icon } from './Icon'
 const navItems = [
   { to: '/map', label: 'Map' },
   { to: '/explore', label: 'Discover' },
+  { to: '/following', label: 'Following' },
   { to: '/saved', label: 'Saved' },
 ]
 
@@ -38,7 +39,7 @@ export function TopNavBar() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-margin-mobile md:px-margin-desktop bg-surface border-b border-outline-variant h-12">
       <Link to="/explore" className="font-headline-sm text-headline-sm font-bold text-on-surface shrink-0">
-        Bangalore Food Map
+        NxtSpot
       </Link>
 
       {user && (
@@ -108,7 +109,7 @@ export function TopNavBar() {
         ) : session === null ? (
           <button
             onClick={handleGoogleLogin}
-            className="font-label-caps text-label-caps uppercase tracking-wider px-4 py-2 bg-[#1a1a1a] text-white hover:bg-primary transition-colors border border-[#1a1a1a]"
+            className="hidden md:block font-label-caps text-label-caps uppercase tracking-wider px-4 py-2 bg-[#1a1a1a] text-white hover:bg-primary transition-colors border border-[#1a1a1a]"
           >
             Sign In
           </button>

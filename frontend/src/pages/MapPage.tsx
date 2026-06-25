@@ -27,6 +27,7 @@ export function MapPage() {
   const markers = useRef<mapboxgl.Marker[]>([])
   const popups = useRef<mapboxgl.Popup[]>([])
   const [mapReady, setMapReady] = useState(false)
+  const [mapMoving, setMapMoving] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [addPinMode, setAddPinMode] = useState(false)
   const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number; name?: string } | null>(null)
@@ -139,6 +140,8 @@ export function MapPage() {
       zoom: BANGALORE_DEFAULT_ZOOM,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
+    map.current.on('movestart', () => setMapMoving(true))
+    map.current.on('moveend', () => setMapMoving(false))
     setMapReady(true)
     return () => {
       map.current?.remove()
@@ -246,12 +249,29 @@ export function MapPage() {
         }).setDOMContent(hoverEl)
         popups.current.push(hoverPopup)
 
-        el.addEventListener('mouseenter', () => {
-          hoverPopup.setLngLat([pin.lng, pin.lat]).addTo(map.current!)
-        })
-        el.addEventListener('mouseleave', () => {
-          hoverPopup.remove()
-        })
+        let hoverTimeout: ReturnType<typeof setTimeout> | null = null
+        const showPopup = () => {
+          if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
+          if (!hoverPopup.isOpen()) {
+            hoverPopup.setLngLat([pin.lng, pin.lat]).addTo(map.current!)
+          }
+          // Attach listeners to the full popup container (tip + content + padding)
+          // once per DOM element so the entire visible area keeps the popup alive.
+          const popupEl = hoverPopup.getElement()
+          if (popupEl && !popupEl.dataset.listenersAttached) {
+            popupEl.dataset.listenersAttached = 'true'
+            popupEl.addEventListener('mouseenter', showPopup)
+            popupEl.addEventListener('mouseleave', hidePopup)
+          }
+        }
+        const hidePopup = () => {
+          hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
+        }
+
+        if (!window.matchMedia('(hover: none)').matches) {
+          el.addEventListener('mouseenter', showPopup)
+          el.addEventListener('mouseleave', hidePopup)
+        }
         el.addEventListener('click', () => {
           hoverPopup.remove()
           setSelectedPin(pin)
@@ -305,11 +325,23 @@ export function MapPage() {
     })
   }
 
+  const allToggleIds = followedInfluencers.map((inf) => inf.id)
+  const allVisible = allToggleIds.length > 0 && allToggleIds.every((id) => !hiddenIds.has(id))
+
+  const toggleAll = () => {
+    if (allVisible) {
+      setHiddenIds(new Set(allToggleIds))
+    } else {
+      setHiddenIds(new Set())
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <TopNavBar />
       <div className="flex flex-1 mt-12 relative">
         <SideNavBar
+          pinOpen={!!selectedPin || mapMoving}
           onAddPin={
             currentUser?.role === 'influencer'
               ? () => {
@@ -351,8 +383,19 @@ export function MapPage() {
             </>
           )}
 
-          <div className="px-4 py-3 font-label-caps text-label-caps text-secondary uppercase">
-            Followed Curators
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="font-label-caps text-label-caps text-secondary uppercase">Followed Curators</span>
+            {followedInfluencers.length > 0 && (
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={allVisible}
+                  onChange={toggleAll}
+                />
+                <div className="w-7 h-4 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary border border-outline-variant" />
+              </label>
+            )}
           </div>
           <div className="flex flex-col flex-1 overflow-y-auto">
             {followedInfluencers.length === 0 && (
@@ -395,11 +438,11 @@ export function MapPage() {
           </div>
         </SideNavBar>
 
-        <main className="flex-1 w-full md:ml-[220px] relative">
+        <main className="flex-1 w-full relative">
           <div ref={mapContainer} className="absolute inset-0" />
 
           {addPinMode && mapReady && map.current && (
-            <div className="absolute top-4 left-4 z-30 w-72">
+            <div className="absolute top-4 left-16 z-30 w-72">
               <SearchBox
                 accessToken={MAPBOX_TOKEN}
                 map={map.current}
@@ -432,7 +475,7 @@ export function MapPage() {
           )}
 
           {addPinMode && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-outline-variant px-4 py-2 flex items-center gap-3 font-body-base text-body-base text-on-surface">
+            <div className="absolute top-16 md:top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-outline-variant px-4 py-2 flex items-center gap-3 font-body-base text-body-base text-on-surface">
               Click a location on the map to place your pin
               <button
                 onClick={() => setAddPinMode(false)}
@@ -454,30 +497,64 @@ export function MapPage() {
           )}
 
           {selectedPin && (
-            <aside className="absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-y-auto">
+            <aside className="absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-y-auto animate-slide-in-right">
               <div className="sticky top-0 bg-surface z-10 flex justify-between items-center p-4 border-b border-outline-variant">
-                <button
-                  onClick={() => setSelectedPin(null)}
-                  className="text-on-surface-variant hover:text-on-surface transition-colors"
-                >
-                  <Icon name="close" />
-                </button>
-                {isOwnPin ? (
-                  <button
-                    onClick={() => setEditingPin(selectedPin)}
-                    className="text-on-surface-variant hover:text-primary transition-colors"
-                  >
-                    <Icon name="edit" />
-                  </button>
+                {confirmingDeletePin ? (
+                  <>
+                    <span className="font-body-sm text-body-sm text-on-surface">Delete this pin?</span>
+                    <div className="flex items-center gap-2">
+                      {deletePin.isError && (
+                        <span className="font-body-sm text-body-sm text-red-600">Failed.</span>
+                      )}
+                      <button
+                        onClick={() => setConfirmingDeletePin(false)}
+                        className="font-label-caps text-label-caps text-secondary hover:text-on-surface uppercase transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => deletePin.mutate(selectedPin.id)}
+                        disabled={deletePin.isPending}
+                        className="px-3 py-1 bg-red-600 text-white font-label-caps text-label-caps uppercase hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {deletePin.isPending ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <button
-                    onClick={() => handleSaveToggle(selectedPin.id)}
-                    className={`transition-colors ${
-                      savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
-                    }`}
-                  >
-                    <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setSelectedPin(null)}
+                      className="text-on-surface-variant hover:text-on-surface transition-colors"
+                    >
+                      <Icon name="close" />
+                    </button>
+                    {isOwnPin ? (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setConfirmingDeletePin(true)}
+                          className="text-on-surface-variant hover:text-red-600 transition-colors"
+                        >
+                          <Icon name="delete" />
+                        </button>
+                        <button
+                          onClick={() => setEditingPin(selectedPin)}
+                          className="text-on-surface-variant hover:text-primary transition-colors"
+                        >
+                          <Icon name="edit" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleSaveToggle(selectedPin.id)}
+                        className={`transition-colors ${
+                          savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
+                        }`}
+                      >
+                        <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -532,7 +609,7 @@ export function MapPage() {
                     </p>
                   )}
 
-                  <div className="mt-auto pt-6 border-t border-outline-variant flex flex-col gap-3">
+                  <div className="mt-auto pt-6 pb-16 md:pb-0 border-t border-outline-variant">
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
                       target="_blank"
@@ -542,40 +619,6 @@ export function MapPage() {
                       <Icon name="directions" className="text-[18px]" />
                       GET DIRECTIONS
                     </a>
-
-                    {isOwnPin && !confirmingDeletePin && (
-                      <button
-                        onClick={() => setConfirmingDeletePin(true)}
-                        className="w-full py-3 border border-red-300 text-red-600 font-label-caps text-label-caps uppercase tracking-wider hover:bg-red-50 transition-colors"
-                      >
-                        Delete Pin
-                      </button>
-                    )}
-                    {isOwnPin && confirmingDeletePin && (
-                      <div className="flex flex-col gap-2">
-                        <p className="font-body-sm text-body-sm text-on-surface">
-                          Delete this pin? This cannot be undone.
-                        </p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => deletePin.mutate(selectedPin.id)}
-                            disabled={deletePin.isPending}
-                            className="flex-1 py-2 bg-red-600 text-white font-label-caps text-label-caps uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50"
-                          >
-                            {deletePin.isPending ? 'Deleting…' : 'Yes, delete'}
-                          </button>
-                          <button
-                            onClick={() => setConfirmingDeletePin(false)}
-                            className="flex-1 py-2 border border-outline-variant font-label-caps text-label-caps uppercase tracking-wider text-on-surface hover:bg-surface-container transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                        {deletePin.isError && (
-                          <p className="font-body-sm text-body-sm text-red-600">Could not delete pin. Try again.</p>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

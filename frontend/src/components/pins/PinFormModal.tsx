@@ -158,15 +158,15 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="font-label-caps text-label-caps text-on-surface-variant">Rating (1–5)</span>
+            <span className="font-label-caps text-label-caps text-on-surface-variant">Rating (0–5)</span>
             <input
               type="number"
-              min={1}
+              min={0}
               max={5}
-              step={0.5}
+              step={0.01}
               value={rating}
               onChange={(e) => setRating(e.target.value)}
-              className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface"
+              className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </label>
 

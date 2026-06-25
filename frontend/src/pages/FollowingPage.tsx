@@ -1,46 +1,37 @@
+import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { getAppToken } from '@/lib/auth'
-import { useSession } from '@/lib/useSession'
-import { useCurrentUser } from '@/lib/useCurrentUser'
 import { influencersApi, pinsApi, subscriptionsApi, type Influencer } from '@/lib/api'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
-import { useState } from 'react'
 
-export function ExplorePage() {
-  const session = useSession()
+export function FollowingPage() {
   const qc = useQueryClient()
-  const { data: currentUser } = useCurrentUser()
   const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: influencers, isLoading } = useQuery({
-    queryKey: ['influencers'],
-    queryFn: influencersApi.getAll,
-  })
-
-  const { data: following } = useQuery({
+  const { data: following, isLoading: loadingFollowing } = useQuery({
     queryKey: ['following'],
     queryFn: async () => {
       const token = await getAppToken()
       return subscriptionsApi.getFollowing(token)
     },
-    enabled: !!session,
   })
-  const followingIds = new Set(following?.map((f) => f.influencer_id))
 
+  const { data: allInfluencers, isLoading: loadingInfluencers } = useQuery({
+    queryKey: ['influencers'],
+    queryFn: influencersApi.getAll,
+  })
+
+  const followingIds = new Set(following?.map((f) => f.influencer_id))
   const q = searchQuery.trim().toLowerCase()
-  const visibleInfluencers = influencers
-    ?.filter(
-      (inf) =>
-        inf.id !== currentUser?.id &&
-        !followingIds.has(inf.id) &&
-        (!q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q)),
-    )
-    .sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0))
+  const followedInfluencers = (allInfluencers?.filter((inf) => followingIds.has(inf.id)) ?? []).filter(
+    (inf) => !q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q),
+  )
+  const isLoading = loadingFollowing || loadingInfluencers
 
   const { data: selectedPins, isLoading: loadingPins } = useQuery({
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
@@ -48,71 +39,39 @@ export function ExplorePage() {
     enabled: !!selectedInfluencer,
   })
 
-  const follow = useMutation({
-    mutationFn: async (influencerId: string) => {
-      const token = await getAppToken()
-      return subscriptionsApi.follow(influencerId, token)
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['following'] })
-      qc.invalidateQueries({ queryKey: ['feed'] })
-    },
-  })
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
       const token = await getAppToken()
       return subscriptionsApi.unfollow(influencerId, token)
     },
-    onSuccess: () => {
+    onSuccess: (_, influencerId) => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
+      if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
     },
   })
-
-  const handleFollowClick = (influencerId: string) => {
-    if (!session) {
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/explore` },
-      })
-      return
-    }
-    if (followingIds.has(influencerId)) {
-      unfollow.mutate(influencerId)
-    } else {
-      follow.mutate(influencerId)
-      if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopNavBar />
-      <main className="flex-1 mt-12 p-margin-mobile md:p-margin-desktop max-w-container-max mx-auto w-full pb-24 md:pb-16">
-        <header className="mb-12 md:mb-16 max-w-2xl">
-          {session ? (
-            <>
-              <h1 className="font-display-lg text-display-lg text-on-surface mb-4">
-                Discover Bangalore, one table at a time.
+      <div className="flex flex-1 mt-12">
+        <main className="flex-1 w-full px-margin-mobile md:px-margin-desktop py-12 flex flex-col max-w-[1400px] mx-auto pb-24 md:pb-12">
+          <div className="mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-outline-variant pb-6">
+            <div>
+              <h1 className="font-display-lg text-display-lg text-on-surface mb-2 tracking-tight">
+                Following
               </h1>
-              <p className="font-body-base text-body-base text-secondary max-w-lg">
-                Curated selections from the city's most discerning palates. Explore independent
-                cafes, fine dining hideaways, and iconic street food corners.
+              <p className="font-body-base text-body-base text-secondary">
+                Curators whose spots appear on your map.
               </p>
-            </>
-          ) : (
-            <>
-              <h1 className="font-display-lg text-display-lg text-on-surface mb-4">
-                Don't let the best tables go to waste.
-              </h1>
-              <p className="font-body-base text-body-base text-secondary max-w-lg">
-                Join the inner circle.
-              </p>
-            </>
-          )}
-        </header>
+            </div>
+            {!!followedInfluencers.length && (
+              <span className="font-body-sm text-body-sm text-secondary shrink-0">
+                {followedInfluencers.length} {followedInfluencers.length === 1 ? 'curator' : 'curators'}
+              </span>
+            )}
+          </div>
 
-        {session && (
           <div className="mb-8">
             <input
               type="text"
@@ -122,59 +81,46 @@ export function ExplorePage() {
               className="w-full max-w-md border border-outline-variant px-4 py-2 font-body-base text-body-base bg-surface text-on-surface placeholder:text-secondary focus:outline-none focus:border-primary transition-colors"
             />
           </div>
-        )}
 
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Spinner />
-          </div>
-        ) : !visibleInfluencers?.length ? (
-          <p className="text-secondary font-body-base text-body-base">
-            {q ? 'No curators match your search.' : 'No influencers yet.'}
-          </p>
-        ) : session ? (
-          <section className="grid grid-cols-2 lg:grid-cols-3 gap-gutter">
-            {visibleInfluencers.map((inf) => (
-              <InfluencerCard
+          {isLoading && (
+            <div className="flex justify-center py-16">
+              <Spinner />
+            </div>
+          )}
+
+          {!isLoading && followedInfluencers.length === 0 && (
+            <div className="text-center py-16 text-secondary">
+              {q ? (
+                <p className="font-headline-sm text-headline-sm">No curators match your search.</p>
+              ) : (
+                <>
+                  <p className="font-headline-sm text-headline-sm">Not following anyone yet</p>
+                  <p className="font-body-base text-body-base mt-1">
+                    Head to{' '}
+                    <Link to="/explore" className="text-primary hover:underline">
+                      Discover
+                    </Link>{' '}
+                    to find curators to follow.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+            {followedInfluencers.map((inf) => (
+              <FollowingCard
                 key={inf.id}
                 influencer={inf}
-                following={followingIds.has(inf.id)}
                 selected={selectedInfluencer?.id === inf.id}
                 onSelect={() => setSelectedInfluencer(inf)}
-                onFollowClick={() => handleFollowClick(inf.id)}
-                pending={
-                  (follow.isPending && follow.variables === inf.id) ||
-                  (unfollow.isPending && unfollow.variables === inf.id)
-                }
+                onUnfollow={() => unfollow.mutate(inf.id)}
+                pending={unfollow.isPending && unfollow.variables === inf.id}
               />
             ))}
-          </section>
-        ) : (
-          <div>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-headline-sm text-headline-sm text-on-surface">Curators</h2>
-              <button
-                onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/explore` } })}
-                className="font-label-caps text-label-caps text-primary uppercase tracking-wider hover:underline"
-              >
-                Sign in to see all →
-              </button>
-            </div>
-            <div className="overflow-hidden relative" style={{ width: '100vw', left: '50%', transform: 'translateX(-50%)' }}>
-              <div className="flex gap-5 animate-marquee" style={{ width: 'max-content' }}>
-                {[...visibleInfluencers.slice(0, 8), ...visibleInfluencers.slice(0, 8)].map((inf, i) => (
-                  <MarqueeCard
-                    key={i}
-                    influencer={inf}
-                    onFollowClick={() => handleFollowClick(inf.id)}
-                    pending={follow.isPending && follow.variables === inf.id}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
-        )}
-      </main>
+        </main>
+      </div>
       <BottomNavBar />
 
       {selectedInfluencer && (
@@ -187,6 +133,13 @@ export function ExplorePage() {
             >
               <Icon name="close" />
             </button>
+            <Link
+              to={`/i/${selectedInfluencer.handle}`}
+              className="font-label-caps text-label-caps text-secondary hover:text-primary uppercase tracking-wider transition-colors flex items-center gap-1"
+            >
+              View map
+              <Icon name="open_in_new" className="text-[14px]" />
+            </Link>
           </div>
 
           {/* Influencer hero */}
@@ -221,18 +174,11 @@ export function ExplorePage() {
               </div>
             </div>
             <button
-              onClick={() => handleFollowClick(selectedInfluencer.id)}
-              disabled={
-                (follow.isPending && follow.variables === selectedInfluencer.id) ||
-                (unfollow.isPending && unfollow.variables === selectedInfluencer.id)
-              }
-              className={`w-full py-2 border font-label-caps text-label-caps uppercase tracking-wider transition-colors disabled:opacity-50 ${
-                followingIds.has(selectedInfluencer.id)
-                  ? 'bg-primary text-on-primary border-primary hover:bg-transparent hover:text-primary'
-                  : 'border-outline text-on-surface hover:bg-primary hover:text-on-primary hover:border-primary'
-              }`}
+              onClick={() => unfollow.mutate(selectedInfluencer.id)}
+              disabled={unfollow.isPending && unfollow.variables === selectedInfluencer.id}
+              className="w-full py-2 border border-primary bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-wider hover:bg-transparent hover:text-primary transition-colors disabled:opacity-50"
             >
-              {followingIds.has(selectedInfluencer.id) ? 'Following' : 'Follow'}
+              Unfollow
             </button>
           </div>
 
@@ -285,19 +231,17 @@ export function ExplorePage() {
   )
 }
 
-function InfluencerCard({
+function FollowingCard({
   influencer,
-  following,
   selected,
   onSelect,
-  onFollowClick,
+  onUnfollow,
   pending,
 }: {
   influencer: Influencer
-  following: boolean
   selected: boolean
   onSelect: () => void
-  onFollowClick: () => void
+  onUnfollow: () => void
   pending: boolean
 }) {
   return (
@@ -325,54 +269,15 @@ function InfluencerCard({
       </p>
       <h2 className="font-headline-sm text-headline-sm text-on-surface mb-1">{influencer.name}</h2>
       <p className="font-body-sm text-body-sm text-secondary mb-6">
-        {influencer.follower_count} {influencer.follower_count === 1 ? 'follower' : 'followers'}
+        {influencer.pin_count} {influencer.pin_count === 1 ? 'spot' : 'spots'}
       </p>
       <button
-        onClick={(e) => { e.stopPropagation(); onFollowClick() }}
+        onClick={(e) => { e.stopPropagation(); onUnfollow() }}
         disabled={pending}
-        className={`w-full py-2 border font-label-caps text-label-caps uppercase tracking-wider transition-colors disabled:opacity-50 ${
-          following
-            ? 'bg-primary text-on-primary border-primary'
-            : 'border-outline text-on-surface hover:bg-primary hover:text-on-primary hover:border-primary'
-        }`}
+        className="w-full py-2 border border-primary bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-wider hover:bg-transparent hover:text-primary transition-colors disabled:opacity-50"
       >
-        {following ? 'Following' : 'Follow'}
+        Unfollow
       </button>
-    </article>
-  )
-}
-
-function MarqueeCard({
-  influencer,
-  onFollowClick,
-  pending,
-}: {
-  influencer: Influencer
-  onFollowClick: () => void
-  pending: boolean
-}) {
-  return (
-    <article className="relative w-72 h-72 shrink-0 overflow-hidden border border-outline-variant">
-      {influencer.avatar_url ? (
-        <img src={influencer.avatar_url} alt={influencer.name} className="absolute inset-0 w-full h-full object-cover" />
-      ) : (
-        <div className="absolute inset-0 bg-surface-container" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-      <div className="absolute bottom-0 left-0 right-0 p-5">
-        <p className="font-label-caps text-label-caps text-white/70 uppercase mb-1 truncate">@{influencer.handle}</p>
-        <p className="font-headline-md text-headline-md text-white mb-1">{influencer.name}</p>
-        <p className="font-label-caps text-label-caps text-white/60 mb-4">
-          {influencer.pin_count} {influencer.pin_count === 1 ? 'Spot' : 'Spots'}
-        </p>
-        <button
-          onClick={onFollowClick}
-          disabled={pending}
-          className="px-5 py-2 bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          Follow
-        </button>
-      </div>
     </article>
   )
 }
