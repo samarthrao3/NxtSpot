@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from core.config import settings
 
 
 VibeTag = Literal["Casual", "Date Night", "Hidden Gem", "Street Food"]
@@ -21,6 +23,14 @@ def _assert_bangalore(lat: float | None, lng: float | None) -> None:
         raise ValueError("Longitude outside Bangalore bounding box")
 
 
+def _assert_photo_urls(photos: list[str]) -> list[str]:
+    prefix = f"{settings.supabase_url}/storage/v1/object/public/photos/"
+    for url in photos:
+        if not url.startswith(prefix):
+            raise ValueError(f"Photo URL must point to this app's Supabase Storage bucket")
+    return photos
+
+
 class PinCreate(BaseModel):
     restaurant_name: str = Field(min_length=1, max_length=200)
     lat: float
@@ -28,9 +38,14 @@ class PinCreate(BaseModel):
     photos: list[str] = []
     vibe_tag: VibeTag | None = None
     price_range: PriceRange | None = None
-    must_order: str | None = None
-    note: str | None = None
-    rating: float | None = Field(default=None, ge=1.0, le=5.0)
+    must_order: str | None = Field(default=None, max_length=100)
+    note: str | None = Field(default=None, max_length=500)
+    rating: float | None = Field(default=None, ge=0.0, le=5.0)
+
+    @field_validator("photos")
+    @classmethod
+    def validate_photos(cls, v: list[str]) -> list[str]:
+        return _assert_photo_urls(v)
 
     @model_validator(mode="after")
     def validate_bbox(self) -> "PinCreate":
@@ -45,9 +60,16 @@ class PinUpdate(BaseModel):
     photos: list[str] | None = None
     vibe_tag: VibeTag | None = None
     price_range: PriceRange | None = None
-    must_order: str | None = None
-    note: str | None = None
-    rating: float | None = Field(default=None, ge=1.0, le=5.0)
+    must_order: str | None = Field(default=None, max_length=100)
+    note: str | None = Field(default=None, max_length=500)
+    rating: float | None = Field(default=None, ge=0.0, le=5.0)
+
+    @field_validator("photos")
+    @classmethod
+    def validate_photos(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None:
+            return _assert_photo_urls(v)
+        return v
 
     @model_validator(mode="after")
     def validate_bbox(self) -> "PinUpdate":

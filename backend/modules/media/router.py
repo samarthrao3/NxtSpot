@@ -37,7 +37,7 @@ async def get_presigned_url(
                 "Authorization": f"Bearer {settings.supabase_service_key}",
                 "Content-Type": "application/json",
             },
-            json={"expiresIn": 300},
+            json={"expiresIn": 300, "fileSizeLimit": 10485760},  # 10 MB cap
         )
 
     if res.status_code != 200:

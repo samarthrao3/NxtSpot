@@ -10,7 +10,9 @@ from models import Pin, Subscription, User
 
 router = APIRouter()
 
-_TTL = 600  # 10 min
+_PROFILE_TTL = 600   # 10 min
+_LIST_TTL = 120      # 2 min
+_LIST_CACHE_KEY = "influencer_list"
 
 
 def _serialize(user: User, pin_count: int, follower_count: int) -> dict:
@@ -43,19 +45,41 @@ async def get_influencer(handle: str, db: AsyncSession = Depends(get_db)):
     ).scalar_one()
 
     data = _serialize(user, pin_count, follower_count)
-    await redis.set(cache_key, json.dumps(data), ex=_TTL)
+    await redis.set(cache_key, json.dumps(data), ex=_PROFILE_TTL)
     return data
 
 
 @router.get("/", summary="List all influencers")
 async def list_influencers(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
+    redis = await get_redis()
+    cached = await redis.get(_LIST_CACHE_KEY)
+    if cached:
+        return json.loads(cached)
+
+    users_result = await db.execute(
         select(User).where(User.role == "influencer").order_by(User.created_at.desc())
     )
-    users = result.scalars().all()
-    out = []
-    for u in users:
-        pc = (await db.execute(select(func.count()).where(Pin.influencer_id == u.id))).scalar_one()
-        fc = (await db.execute(select(func.count()).where(Subscription.influencer_id == u.id))).scalar_one()
-        out.append(_serialize(u, pc, fc))
+    users = users_result.scalars().all()
+
+    if not users:
+        return []
+
+    user_ids = [u.id for u in users]
+
+    pin_counts_result = await db.execute(
+        select(Pin.influencer_id, func.count().label("cnt"))
+        .where(Pin.influencer_id.in_(user_ids))
+        .group_by(Pin.influencer_id)
+    )
+    pin_counts = {row.influencer_id: row.cnt for row in pin_counts_result}
+
+    follower_counts_result = await db.execute(
+        select(Subscription.influencer_id, func.count().label("cnt"))
+        .where(Subscription.influencer_id.in_(user_ids))
+        .group_by(Subscription.influencer_id)
+    )
+    follower_counts = {row.influencer_id: row.cnt for row in follower_counts_result}
+
+    out = [_serialize(u, pin_counts.get(u.id, 0), follower_counts.get(u.id, 0)) for u in users]
+    await redis.set(_LIST_CACHE_KEY, json.dumps(out), ex=_LIST_TTL)
     return out

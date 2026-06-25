@@ -1,12 +1,13 @@
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.database import get_db
+from core.limiter import limiter
 from models import User
 from .deps import create_access_token, get_current_user
 from .schemas import LoginIn, LoginOut, UserOut
@@ -15,7 +16,8 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=LoginOut, summary="Exchange a Supabase Google OAuth token for an app JWT")
-async def login(body: LoginIn, db: AsyncSession = Depends(get_db)) -> LoginOut:
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginIn, db: AsyncSession = Depends(get_db)) -> LoginOut:
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(
             f"{settings.supabase_url}/auth/v1/user",
@@ -48,7 +50,7 @@ async def login(body: LoginIn, db: AsyncSession = Depends(get_db)) -> LoginOut:
     await db.commit()
     await db.refresh(user)
 
-    token = create_access_token(user_id=user.id, role=user.role)
+    token = create_access_token(user_id=user.id)
     return LoginOut(access_token=token, user=UserOut.model_validate(user))
 
 
