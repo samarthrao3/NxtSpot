@@ -37,9 +37,12 @@ async def update_me(
 
     try:
         await db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="That handle is already taken")
+        detail = str(exc.orig) if exc.orig else ""
+        if "handle" in detail:
+            raise HTTPException(status_code=409, detail="That handle is already taken")
+        raise HTTPException(status_code=409, detail="Update failed due to a conflict")
 
     await db.refresh(current_user)
     return UserOut.model_validate(current_user)

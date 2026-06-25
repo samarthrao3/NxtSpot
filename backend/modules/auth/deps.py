@@ -16,10 +16,9 @@ security = HTTPBearer()
 ACCESS_TOKEN_EXPIRES = timedelta(days=7)
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> str:
+def create_access_token(user_id: uuid.UUID) -> str:
     payload = {
         "sub": str(user_id),
-        "role": role,
         "exp": datetime.now(timezone.utc) + ACCESS_TOKEN_EXPIRES,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
