@@ -35,6 +35,25 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  @keyframes slide-in-right {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.25s ease-out;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .animate-marquee {
+    animation: marquee 40s linear infinite;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
 }
 
 /* Flatten Mapbox's default rounded/shadowed controls to match the editorial design */

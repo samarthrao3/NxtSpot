@@ -1,9 +1,12 @@
 import uuid
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.database import get_db
 from models import User, Pin, SavedPin
 from modules.auth.deps import get_current_user
@@ -19,17 +22,47 @@ async def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.model_validate(current_user)
 
 
-@router.patch("/me", response_model=UserOut, summary="Update name and/or avatar_url")
+@router.patch("/me", response_model=UserOut, summary="Update name, avatar_url, and/or handle")
 async def update_me(
     body: UserUpdateIn,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UserOut:
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    if "handle" in updates and current_user.role != "influencer":
+        raise HTTPException(status_code=403, detail="Only influencers can set a handle")
+
+    for field, value in updates.items():
         setattr(current_user, field, value)
-    await db.commit()
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="That handle is already taken")
+
     await db.refresh(current_user)
     return UserOut.model_validate(current_user)
+
+
+@router.delete("/me", status_code=204, summary="Permanently delete the current user's account")
+async def delete_me(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.delete(
+            f"{settings.supabase_url}/auth/v1/admin/users/{current_user.id}",
+            headers={
+                "Authorization": f"Bearer {settings.supabase_service_key}",
+                "apikey": settings.supabase_service_key,
+            },
+        )
+    if resp.status_code not in (200, 404):
+        raise HTTPException(status_code=502, detail="Could not delete account, please try again")
+
+    await db.delete(current_user)
+    await db.commit()
 
 
 @router.get("/me/saved", response_model=list[PinOut], summary="All pins the current user has saved")

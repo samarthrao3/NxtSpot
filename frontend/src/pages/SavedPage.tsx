@@ -1,14 +1,15 @@
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { savedPinsApi } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { TopNavBar } from '@/components/ui/TopNavBar'
-import { SideNavBar } from '@/components/ui/SideNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
 
 export function SavedPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
 
   const { data: pins, isLoading } = useQuery({
     queryKey: ['saved-pins'],
@@ -30,12 +31,11 @@ export function SavedPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <TopNavBar />
       <div className="flex flex-1 mt-12">
-        <SideNavBar />
-        <main className="flex-1 md:ml-[220px] w-full px-margin-mobile md:px-margin-desktop py-12 flex flex-col max-w-[1400px] mx-auto pb-24 md:pb-12">
+        <main className="flex-1 w-full px-margin-mobile md:px-margin-desktop py-12 flex flex-col max-w-[1400px] mx-auto pb-24 md:pb-12">
           <div className="mb-12 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-outline-variant pb-6">
             <div>
               <h1 className="font-display-lg text-display-lg text-on-surface mb-2 tracking-tight">
-                Saved Recommendations
+                Saved Spots
               </h1>
               <p className="font-body-base text-body-base text-secondary">
                 Your curated collection of Bangalore's finest.
@@ -43,7 +43,7 @@ export function SavedPage() {
             </div>
             {!!pins?.length && (
               <div className="flex gap-2 font-body-sm text-body-sm text-secondary shrink-0">
-                <span>{pins.length} {pins.length === 1 ? 'Place' : 'Places'}</span>
+                <span>{pins.length} {pins.length === 1 ? 'Spot' : 'Spots'}</span>
               </div>
             )}
           </div>
@@ -61,14 +61,18 @@ export function SavedPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
             {pins?.map((pin) => (
               <article
                 key={pin.id}
-                className="bg-surface-container-lowest border border-outline-variant flex flex-col h-[400px] relative group hover:border-outline transition-colors"
+                onClick={() => navigate('/map', { state: { focusPin: pin } })}
+                className="bg-surface-container-lowest border border-outline-variant flex flex-col h-[400px] relative group hover:border-outline transition-colors cursor-pointer"
               >
                 <button
-                  onClick={() => unsave.mutate(pin.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    unsave.mutate(pin.id)
+                  }}
                   disabled={unsave.isPending}
                   className="absolute top-4 right-4 z-10 w-8 h-8 bg-surface-container-lowest border border-outline-variant rounded-full flex items-center justify-center hover:bg-surface-container transition-colors"
                 >

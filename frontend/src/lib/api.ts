@@ -123,6 +123,15 @@ export const subscriptionsApi = {
     apiFetch<{ influencer_id: string }[]>('/subscriptions', { token }),
 }
 
+// ---------- Users ----------
+
+export const usersApi = {
+  updateMe: (data: { name?: string | null; avatar_url?: string | null; handle?: string | null }, token: string) =>
+    apiFetch<UserProfile>('/users/me', { method: 'PATCH', body: JSON.stringify(data), token }),
+
+  deleteMe: (token: string) => apiFetch<void>('/users/me', { method: 'DELETE', token }),
+}
+
 // ---------- Saved pins ----------
 
 export const savedPinsApi = {
