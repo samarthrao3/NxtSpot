@@ -88,11 +88,11 @@ export function SettingsPage() {
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <TopNavBar />
-      <main className="flex-1 mt-12 overflow-y-auto px-margin-mobile md:px-margin-desktop py-12 pb-24 md:pb-12">
-        <div className="max-w-xl mx-auto flex flex-col gap-8">
-          <h1 className="font-display-lg text-display-lg text-on-surface">Settings</h1>
+      <main className="flex-1 mt-12 overflow-hidden px-margin-mobile md:px-margin-desktop pt-6 pb-20 md:pb-6">
+        <div className="max-w-xl mx-auto flex flex-col gap-4">
+          <h1 className="font-headline-md text-headline-md text-on-surface">Settings</h1>
 
-          <div className="flex flex-col gap-6 border border-outline-variant p-6 bg-surface">
+          <div className="flex flex-col gap-4 border border-outline-variant p-5 bg-surface">
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-full overflow-hidden border border-outline-variant bg-surface-container flex items-center justify-center shrink-0">
                 {avatarUrl ? (
@@ -164,7 +164,7 @@ export function SettingsPage() {
             </button>
           </div>
 
-          <div className="border border-red-300 p-6 bg-surface flex flex-col gap-4">
+          <div className="border border-red-300 p-5 bg-surface flex flex-col gap-3">
             <h2 className="font-headline-sm text-headline-sm text-red-600">Delete Account</h2>
             <p className="font-body-base text-body-base text-secondary">
               This permanently deletes your account, pins, follows, and saved places. This cannot be undone.
