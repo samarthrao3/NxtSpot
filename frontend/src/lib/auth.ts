@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { authApi, feedApi } from './api'
+import { authApi } from './api'
 import { queryClient } from './queryClient'
 
 // Cached data scoped to "the current user" -- must not survive a sign-out, or the
@@ -17,12 +17,6 @@ async function exchangeForAppToken(supabaseAccessToken: string): Promise<string>
   appToken = access_token
   queryClient.setQueryData(['me'], user)
   localStorage.setItem(ME_STORAGE_KEY, JSON.stringify(user))
-  // Prefetch feed in the background so MapPage renders instantly on first visit
-  queryClient.prefetchQuery({
-    queryKey: ['feed'],
-    queryFn: () => feedApi.get(access_token),
-    staleTime: 120_000,
-  })
   return access_token
 }
 

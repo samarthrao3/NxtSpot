@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from core.redis import get_redis
-from models import Pin, SavedPin, Subscription, User
+from models import Subscription, User
 from modules.auth.deps import get_current_user
 from .schemas import FollowingOut
 
@@ -67,16 +67,6 @@ async def unfollow(
         response.status_code = 200
         return
     await db.delete(sub)
-
-    # Remove saved pins that belong to this influencer
-    pins_result = await db.execute(
-        select(SavedPin)
-        .join(Pin, Pin.id == SavedPin.pin_id)
-        .where(SavedPin.user_id == current_user.id, Pin.influencer_id == influencer_id)
-    )
-    for saved in pins_result.scalars().all():
-        await db.delete(saved)
-
     await db.commit()
     redis = await get_redis()
     await redis.delete(f"feed_pins:{current_user.id}")
