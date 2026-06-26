@@ -1,14 +1,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from core.redis import get_redis
-from models import Subscription, User
+from models import Pin, Subscription, User
 from modules.auth.deps import get_current_user
-from .schemas import FollowingOut
+from .schemas import FollowingOut, FollowingInfluencerOut
 
 router = APIRouter()
 
@@ -22,6 +22,45 @@ async def list_following(
         select(Subscription.influencer_id).where(Subscription.user_id == current_user.id)
     )
     return [FollowingOut(influencer_id=row[0]) for row in result]
+
+
+@router.get("/influencers", response_model=list[FollowingInfluencerOut])
+async def list_following_influencers(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[FollowingInfluencerOut]:
+    pin_count = (
+        select(func.count())
+        .where(Pin.influencer_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+        .label("pin_count")
+    )
+    follower_count = (
+        select(func.count())
+        .where(Subscription.influencer_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+        .label("follower_count")
+    )
+    rows = (await db.execute(
+        select(User.id, User.name, User.handle, User.avatar_url, pin_count, follower_count)
+        .join(Subscription, Subscription.influencer_id == User.id)
+        .where(Subscription.user_id == current_user.id)
+        .order_by(Subscription.created_at.desc())
+    )).all()
+
+    return [
+        FollowingInfluencerOut(
+            id=r.id,
+            name=r.name,
+            handle=r.handle,
+            avatar_url=r.avatar_url,
+            pin_count=r.pin_count,
+            follower_count=r.follower_count,
+        )
+        for r in rows
+    ]
 
 
 @router.post("/{influencer_id}", status_code=201)

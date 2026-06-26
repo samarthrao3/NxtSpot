@@ -87,6 +87,7 @@ export function ExplorePage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
     },
   })
@@ -97,6 +98,7 @@ export function ExplorePage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
     },
   })

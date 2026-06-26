@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAppToken } from '@/lib/auth'
-import { influencersApi, pinsApi, subscriptionsApi, type Influencer } from '@/lib/api'
+import { pinsApi, subscriptionsApi, type Influencer } from '@/lib/api'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
 import { Icon } from '@/components/ui/Icon'
@@ -14,41 +13,18 @@ export function FollowingPage() {
   const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: following, isLoading: loadingFollowing } = useQuery({
-    queryKey: ['following'],
+  const { data: followedInfluencers = [], isLoading } = useQuery({
+    queryKey: ['following-influencers'],
     queryFn: async () => {
       const token = await getAppToken()
-      return subscriptionsApi.getFollowing(token)
+      return subscriptionsApi.getFollowingInfluencers(token)
     },
   })
 
-  const PAGE_SIZE = 12
-  const {
-    data: pages,
-    isLoading: loadingInfluencers,
-    isFetchingNextPage,
-    fetchNextPage,
-    hasNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['influencers'],
-    queryFn: ({ pageParam }) => influencersApi.getPage(PAGE_SIZE, pageParam),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, _all, lastPageParam) =>
-      lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
-  })
-
-  // Eagerly load all pages so we never miss a followed influencer
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage) fetchNextPage()
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
-
-  const allInfluencers = pages?.pages.flatMap((p) => p.items) ?? []
-  const followingIds = new Set(following?.map((f) => f.influencer_id))
   const q = searchQuery.trim().toLowerCase()
-  const followedInfluencers = allInfluencers
-    .filter((inf) => followingIds.has(inf.id))
-    .filter((inf) => !q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q))
-  const isLoading = loadingFollowing || loadingInfluencers || isFetchingNextPage
+  const visibleInfluencers = followedInfluencers.filter(
+    (inf) => !q || inf.name?.toLowerCase().includes(q) || inf.handle?.toLowerCase().includes(q),
+  )
 
   const { data: selectedPins, isLoading: loadingPins } = useQuery({
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
@@ -63,6 +39,7 @@ export function FollowingPage() {
     },
     onSuccess: (_, influencerId) => {
       qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
       if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
     },
@@ -125,7 +102,7 @@ export function FollowingPage() {
           )}
 
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-            {followedInfluencers.map((inf) => (
+            {visibleInfluencers.map((inf) => (
               <FollowingCard
                 key={inf.id}
                 influencer={inf}

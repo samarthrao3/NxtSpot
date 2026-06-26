@@ -127,6 +127,9 @@ export const subscriptionsApi = {
 
   getFollowing: (token: string) =>
     apiFetch<{ influencer_id: string }[]>('/subscriptions', { token }),
+
+  getFollowingInfluencers: (token: string) =>
+    apiFetch<Influencer[]>('/subscriptions/influencers', { token }),
 }
 
 // ---------- Users ----------

@@ -163,6 +163,7 @@ export function MapPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
     },
   })
