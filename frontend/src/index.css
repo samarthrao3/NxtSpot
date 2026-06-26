@@ -44,6 +44,14 @@
     animation: slide-in-right 0.25s ease-out;
   }
 
+  @keyframes slide-out-right {
+    from { transform: translateX(0); }
+    to   { transform: translateX(100%); }
+  }
+  .animate-slide-out-right {
+    animation: slide-out-right 0.25s ease-in forwards;
+  }
+
   @keyframes marquee {
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }

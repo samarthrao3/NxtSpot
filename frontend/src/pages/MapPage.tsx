@@ -36,12 +36,24 @@ export function MapPage() {
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
   const [editingPin, setEditingPin] = useState<Pin | null>(null)
   const [confirmingDeletePin, setConfirmingDeletePin] = useState(false)
+  const [spottersPanelOpen, setSpottersPanelOpen] = useState(false)
+  const [spottersClosing, setSpottersClosing] = useState(false)
+
+  const closeSpottersPanel = () => {
+    setSpottersClosing(true)
+    setTimeout(() => {
+      setSpottersPanelOpen(false)
+      setSpottersClosing(false)
+    }, 250)
+  }
 
   const { data: currentUser } = useCurrentUser()
   const isOwnPin = !!selectedPin && currentUser?.role === 'influencer' && selectedPin.influencer_id === currentUser.id
 
   useEffect(() => {
     setConfirmingDeletePin(false)
+    setSpottersPanelOpen(false)
+    setSpottersClosing(false)
   }, [selectedPin?.id])
 
   const { data: savedPins } = useQuery({
@@ -129,6 +141,31 @@ export function MapPage() {
 
   const followingIds = new Set(following?.map((f) => f.influencer_id))
   const followedInfluencers = allInfluencers?.filter((inf) => followingIds.has(inf.id)) ?? []
+
+  const unfollow = useMutation({
+    mutationFn: async (influencerId: string) => {
+      const token = await getAppToken()
+      return subscriptionsApi.unfollow(influencerId, token)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['following'] })
+      qc.invalidateQueries({ queryKey: ['feed'] })
+    },
+  })
+
+  const spotterInfluencers = useMemo(() => {
+    if (!selectedPin || !markerPins || !allInfluencers) return []
+    const pinnerIds = new Set(
+      markerPins
+        .filter(
+          p =>
+            p.restaurant_name.toLowerCase() === selectedPin.restaurant_name.toLowerCase() &&
+            followingIds.has(p.influencer_id),
+        )
+        .map(p => p.influencer_id),
+    )
+    return allInfluencers.filter(inf => pinnerIds.has(inf.id))
+  }, [selectedPin, markerPins, allInfluencers, followingIds])
 
   // Initialise map
   useEffect(() => {
@@ -268,10 +305,12 @@ export function MapPage() {
           hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
         }
 
-        if (!window.matchMedia('(hover: none)').matches) {
-          el.addEventListener('mouseenter', showPopup)
-          el.addEventListener('mouseleave', hidePopup)
-        }
+        el.addEventListener('mouseenter', () => {
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
+        })
+        el.addEventListener('mouseleave', () => {
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
+        })
         el.addEventListener('click', () => {
           hoverPopup.remove()
           setSelectedPin(pin)
@@ -587,6 +626,19 @@ export function MapPage() {
                         {selectedPin.price_range}
                       </span>
                     )}
+                    {(() => {
+                      const count = markerPins?.filter(
+                        p => p.restaurant_name.toLowerCase() === selectedPin.restaurant_name.toLowerCase()
+                      ).length ?? 1
+                      return (
+                        <button
+                          onClick={() => setSpottersPanelOpen(true)}
+                          className="border border-primary px-2 py-1 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors"
+                        >
+                          {count} {count === 1 ? 'spotter' : 'spotters'} recommended this →
+                        </button>
+                      )
+                    })()}
                   </div>
                   <h2 className="font-headline-md text-headline-md text-on-surface mt-2 mb-1">
                     {selectedPin.restaurant_name}
@@ -621,6 +673,59 @@ export function MapPage() {
                     </a>
                   </div>
                 </div>
+              </div>
+            </aside>
+          )}
+
+          {spottersPanelOpen && selectedPin && (
+            <aside className={`absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface border-l border-outline-variant z-50 flex flex-col ${spottersClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'}`}>
+              <div className="sticky top-0 bg-surface z-10 flex items-center gap-3 p-4 border-b border-outline-variant">
+                <button
+                  onClick={closeSpottersPanel}
+                  className="text-on-surface-variant hover:text-on-surface transition-colors"
+                >
+                  <Icon name="arrow_back" />
+                </button>
+                <span className="font-headline-sm text-headline-sm text-on-surface">
+                  Recommended by
+                </span>
+              </div>
+
+              <div className="flex flex-col overflow-y-auto">
+                {spotterInfluencers.length === 0 ? (
+                  <p className="px-4 py-6 font-body-sm text-body-sm text-secondary">
+                    None of the spotters you follow have recommended this place.
+                  </p>
+                ) : (
+                  spotterInfluencers.map(inf => (
+                    <div
+                      key={inf.id}
+                      className="flex items-center justify-between px-4 py-3 border-b border-outline-variant"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant shrink-0 bg-surface-container">
+                          {inf.avatar_url ? (
+                            <img src={inf.avatar_url} alt={inf.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="w-full h-full flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant">
+                              {inf.name[0]}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-body-base text-body-base text-on-surface truncate">
+                          @{inf.handle}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => unfollow.mutate(inf.id)}
+                        disabled={unfollow.isPending && unfollow.variables === inf.id}
+                        className="shrink-0 ml-4 px-3 py-1 border border-outline-variant font-label-caps text-label-caps text-on-surface hover:border-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      >
+                        {unfollow.isPending && unfollow.variables === inf.id ? 'Unfollowing…' : 'Unfollow'}
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </aside>
           )}
