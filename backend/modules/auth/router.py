@@ -42,11 +42,13 @@ async def login(request: Request, body: LoginIn, db: AsyncSession = Depends(get_
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
+        # First ever login — seed with Google data
         user = User(id=user_id, email=email, name=name, avatar_url=avatar_url)
         db.add(user)
     else:
-        user.name = name
-        user.avatar_url = avatar_url
+        # Returning user — only sync email, never touch
+        # name or avatar_url since the user may have edited them
+        user.email = email
     await db.commit()
     await db.refresh(user)
 
