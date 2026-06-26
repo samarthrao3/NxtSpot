@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
 import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
@@ -134,13 +134,27 @@ export function MapPage() {
     },
   })
 
-  const { data: allInfluencers } = useQuery({
+  const PAGE_SIZE = 12
+  const {
+    data: influencerPages,
+    isFetchingNextPage: fetchingInfluencers,
+    fetchNextPage: fetchInfluencerPage,
+    hasNextPage: hasMoreInfluencers,
+  } = useInfiniteQuery({
     queryKey: ['influencers'],
-    queryFn: influencersApi.getAll,
+    queryFn: ({ pageParam }) => influencersApi.getPage(PAGE_SIZE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _all, lastPageParam) =>
+      lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
   })
 
+  useEffect(() => {
+    if (hasMoreInfluencers && !fetchingInfluencers) fetchInfluencerPage()
+  }, [hasMoreInfluencers, fetchingInfluencers, fetchInfluencerPage])
+
+  const allInfluencers = influencerPages?.pages.flatMap((p) => p.items) ?? []
   const followingIds = new Set(following?.map((f) => f.influencer_id))
-  const followedInfluencers = allInfluencers?.filter((inf) => followingIds.has(inf.id)) ?? []
+  const followedInfluencers = allInfluencers.filter((inf) => followingIds.has(inf.id))
 
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
