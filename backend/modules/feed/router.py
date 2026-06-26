@@ -17,7 +17,7 @@ router = APIRouter()
 _TTL = 120  # 2 min
 
 
-@router.get("/", response_model=list[FeedGroup])
+@router.get("", response_model=list[FeedGroup])
 async def get_feed(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

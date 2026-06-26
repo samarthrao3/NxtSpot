@@ -13,7 +13,7 @@ from .schemas import FollowingOut
 router = APIRouter()
 
 
-@router.get("/", response_model=list[FollowingOut])
+@router.get("", response_model=list[FollowingOut])
 async def list_following(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

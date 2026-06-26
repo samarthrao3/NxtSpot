@@ -49,7 +49,7 @@ async def get_influencer(handle: str, db: AsyncSession = Depends(get_db)):
     return data
 
 
-@router.get("/", summary="List all influencers")
+@router.get("", summary="List all influencers")
 async def list_influencers(db: AsyncSession = Depends(get_db)):
     redis = await get_redis()
     cached = await redis.get(_LIST_CACHE_KEY)

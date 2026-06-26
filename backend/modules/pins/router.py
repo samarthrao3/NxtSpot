@@ -19,7 +19,7 @@ async def get_influencer_pins(influencer_id: uuid.UUID, db: AsyncSession = Depen
     return [PinOut.model_validate(p) for p in result.scalars().all()]
 
 
-@router.post("/", response_model=PinOut, status_code=201)
+@router.post("", response_model=PinOut, status_code=201)
 async def create_pin(
     body: PinCreate,
     db: AsyncSession = Depends(get_db),
