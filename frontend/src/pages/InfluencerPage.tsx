@@ -133,6 +133,7 @@ export function InfluencerPage() {
             <img
               src={influencer.avatar_url}
               alt={influencer.name}
+              referrerPolicy="no-referrer"
               className="w-10 h-10 object-cover border border-outline-variant mr-3"
             />
           ) : (

@@ -149,6 +149,7 @@ export function FollowingPage() {
                 <img
                   src={selectedInfluencer.avatar_url}
                   alt={selectedInfluencer.name}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -256,6 +257,7 @@ function FollowingCard({
           <img
             src={influencer.avatar_url}
             alt={influencer.name}
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-300"
           />
         ) : (

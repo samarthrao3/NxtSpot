@@ -196,6 +196,7 @@ export function ExplorePage() {
                 <img
                   src={selectedInfluencer.avatar_url}
                   alt={selectedInfluencer.name}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -312,6 +313,7 @@ function InfluencerCard({
           <img
             src={influencer.avatar_url}
             alt={influencer.name}
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-300"
           />
         ) : (
@@ -354,7 +356,7 @@ function MarqueeCard({
   return (
     <article className="relative w-72 h-72 shrink-0 overflow-hidden border border-outline-variant">
       {influencer.avatar_url ? (
-        <img src={influencer.avatar_url} alt={influencer.name} className="absolute inset-0 w-full h-full object-cover" />
+        <img src={influencer.avatar_url} alt={influencer.name} referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-surface-container" />
       )}

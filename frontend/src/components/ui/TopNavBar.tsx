@@ -75,6 +75,7 @@ export function TopNavBar() {
                   <img
                     src={user.user_metadata.avatar_url as string}
                     alt="User profile"
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
                 ) : null}
