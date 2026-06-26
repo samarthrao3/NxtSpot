@@ -13,16 +13,21 @@ router = APIRouter()
 _PROFILE_TTL = 600   # 10 min
 _LIST_TTL = 120      # 2 min
 
-
-def _serialize(user: User, pin_count: int, follower_count: int) -> dict:
-    return {
-        "id": str(user.id),
-        "name": user.name,
-        "handle": user.handle,
-        "avatar_url": user.avatar_url,
-        "pin_count": pin_count,
-        "follower_count": follower_count,
-    }
+# Correlated subqueries — reused across both endpoints
+_pin_count = (
+    select(func.count())
+    .where(Pin.influencer_id == User.id)
+    .correlate(User)
+    .scalar_subquery()
+    .label("pin_count")
+)
+_follower_count = (
+    select(func.count())
+    .where(Subscription.influencer_id == User.id)
+    .correlate(User)
+    .scalar_subquery()
+    .label("follower_count")
+)
 
 
 @router.get("/{handle}", summary="Public influencer profile")
@@ -33,17 +38,22 @@ async def get_influencer(handle: str, db: AsyncSession = Depends(get_db)):
     if cached:
         return json.loads(cached)
 
-    result = await db.execute(select(User).where(User.handle == handle, User.role == "influencer"))
-    user = result.scalar_one_or_none()
-    if user is None:
+    row = (await db.execute(
+        select(User.id, User.name, User.handle, User.avatar_url, _pin_count, _follower_count)
+        .where(User.handle == handle, User.role == "influencer")
+    )).one_or_none()
+
+    if row is None:
         raise HTTPException(status_code=404, detail="Influencer not found")
 
-    pin_count = (await db.execute(select(func.count()).where(Pin.influencer_id == user.id))).scalar_one()
-    follower_count = (
-        await db.execute(select(func.count()).where(Subscription.influencer_id == user.id))
-    ).scalar_one()
-
-    data = _serialize(user, pin_count, follower_count)
+    data = {
+        "id": str(row.id),
+        "name": row.name,
+        "handle": row.handle,
+        "avatar_url": row.avatar_url,
+        "pin_count": row.pin_count,
+        "follower_count": row.follower_count,
+    }
     await redis.set(cache_key, json.dumps(data), ex=_PROFILE_TTL)
     return data
 
@@ -60,40 +70,28 @@ async def list_influencers(
     if cached:
         return json.loads(cached)
 
-    # Fetch one extra to determine has_more without a COUNT query
-    users_result = await db.execute(
-        select(User)
+    rows = (await db.execute(
+        select(User.id, User.name, User.handle, User.avatar_url, _pin_count, _follower_count)
         .where(User.role == "influencer")
         .order_by(User.created_at.desc())
         .limit(limit + 1)
         .offset(offset)
-    )
-    users = users_result.scalars().all()
-    has_more = len(users) > limit
-    users = users[:limit]
+    )).all()
 
-    if not users:
-        out = {"items": [], "has_more": False}
-        await redis.set(cache_key, json.dumps(out), ex=_LIST_TTL)
-        return out
+    has_more = len(rows) > limit
+    rows = rows[:limit]
 
-    user_ids = [u.id for u in users]
-
-    pin_counts_result = await db.execute(
-        select(Pin.influencer_id, func.count().label("cnt"))
-        .where(Pin.influencer_id.in_(user_ids))
-        .group_by(Pin.influencer_id)
-    )
-    pin_counts = {row.influencer_id: row.cnt for row in pin_counts_result}
-
-    follower_counts_result = await db.execute(
-        select(Subscription.influencer_id, func.count().label("cnt"))
-        .where(Subscription.influencer_id.in_(user_ids))
-        .group_by(Subscription.influencer_id)
-    )
-    follower_counts = {row.influencer_id: row.cnt for row in follower_counts_result}
-
-    items = [_serialize(u, pin_counts.get(u.id, 0), follower_counts.get(u.id, 0)) for u in users]
+    items = [
+        {
+            "id": str(r.id),
+            "name": r.name,
+            "handle": r.handle,
+            "avatar_url": r.avatar_url,
+            "pin_count": r.pin_count,
+            "follower_count": r.follower_count,
+        }
+        for r in rows
+    ]
     out = {"items": items, "has_more": has_more}
     await redis.set(cache_key, json.dumps(out), ex=_LIST_TTL)
     return out
