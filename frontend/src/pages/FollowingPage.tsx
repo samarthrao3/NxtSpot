@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { getAppToken } from '@/lib/auth'
 import { influencersApi, pinsApi, subscriptionsApi, type Influencer } from '@/lib/api'
 import { TopNavBar } from '@/components/ui/TopNavBar'
@@ -21,17 +22,33 @@ export function FollowingPage() {
     },
   })
 
-  const { data: allInfluencers, isLoading: loadingInfluencers } = useQuery({
+  const PAGE_SIZE = 12
+  const {
+    data: pages,
+    isLoading: loadingInfluencers,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
     queryKey: ['influencers'],
-    queryFn: influencersApi.getAll,
+    queryFn: ({ pageParam }) => influencersApi.getPage(PAGE_SIZE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _all, lastPageParam) =>
+      lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
   })
 
+  // Eagerly load all pages so we never miss a followed influencer
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const allInfluencers = pages?.pages.flatMap((p) => p.items) ?? []
   const followingIds = new Set(following?.map((f) => f.influencer_id))
   const q = searchQuery.trim().toLowerCase()
-  const followedInfluencers = (allInfluencers?.filter((inf) => followingIds.has(inf.id)) ?? []).filter(
-    (inf) => !q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q),
-  )
-  const isLoading = loadingFollowing || loadingInfluencers
+  const followedInfluencers = allInfluencers
+    .filter((inf) => followingIds.has(inf.id))
+    .filter((inf) => !q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q))
+  const isLoading = loadingFollowing || loadingInfluencers || isFetchingNextPage
 
   const { data: selectedPins, isLoading: loadingPins } = useQuery({
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],

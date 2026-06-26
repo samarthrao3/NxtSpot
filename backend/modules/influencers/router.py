@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,6 @@ router = APIRouter()
 
 _PROFILE_TTL = 600   # 10 min
 _LIST_TTL = 120      # 2 min
-_LIST_CACHE_KEY = "influencer_list"
 
 
 def _serialize(user: User, pin_count: int, follower_count: int) -> dict:
@@ -50,19 +49,33 @@ async def get_influencer(handle: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("", summary="List all influencers")
-async def list_influencers(db: AsyncSession = Depends(get_db)):
+async def list_influencers(
+    limit: int = Query(default=12, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
     redis = await get_redis()
-    cached = await redis.get(_LIST_CACHE_KEY)
+    cache_key = f"influencer_list:{limit}:{offset}"
+    cached = await redis.get(cache_key)
     if cached:
         return json.loads(cached)
 
+    # Fetch one extra to determine has_more without a COUNT query
     users_result = await db.execute(
-        select(User).where(User.role == "influencer").order_by(User.created_at.desc())
+        select(User)
+        .where(User.role == "influencer")
+        .order_by(User.created_at.desc())
+        .limit(limit + 1)
+        .offset(offset)
     )
     users = users_result.scalars().all()
+    has_more = len(users) > limit
+    users = users[:limit]
 
     if not users:
-        return []
+        out = {"items": [], "has_more": False}
+        await redis.set(cache_key, json.dumps(out), ex=_LIST_TTL)
+        return out
 
     user_ids = [u.id for u in users]
 
@@ -80,6 +93,7 @@ async def list_influencers(db: AsyncSession = Depends(get_db)):
     )
     follower_counts = {row.influencer_id: row.cnt for row in follower_counts_result}
 
-    out = [_serialize(u, pin_counts.get(u.id, 0), follower_counts.get(u.id, 0)) for u in users]
-    await redis.set(_LIST_CACHE_KEY, json.dumps(out), ex=_LIST_TTL)
+    items = [_serialize(u, pin_counts.get(u.id, 0), follower_counts.get(u.id, 0)) for u in users]
+    out = {"items": items, "has_more": has_more}
+    await redis.set(cache_key, json.dumps(out), ex=_LIST_TTL)
     return out

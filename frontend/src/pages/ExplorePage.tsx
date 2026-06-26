@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { getAppToken } from '@/lib/auth'
+import { getAppToken, FOLLOWING_STORAGE_KEY } from '@/lib/auth'
 import { useSession } from '@/lib/useSession'
 import { useCurrentUser } from '@/lib/useCurrentUser'
 import { influencersApi, pinsApi, subscriptionsApi, type Influencer } from '@/lib/api'
@@ -8,7 +8,7 @@ import { TopNavBar } from '@/components/ui/TopNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function ExplorePage() {
   const session = useSession()
@@ -17,12 +17,26 @@ export function ExplorePage() {
   const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const { data: influencers, isLoading } = useQuery({
+  const PAGE_SIZE = 12
+  const MIN_VISIBLE = 6
+
+  const {
+    data: pages,
+    isLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
     queryKey: ['influencers'],
-    queryFn: influencersApi.getAll,
+    queryFn: ({ pageParam }) => influencersApi.getPage(PAGE_SIZE, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _all, lastPageParam) =>
+      lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
   })
 
-  const { data: following } = useQuery({
+  const allInfluencers = pages?.pages.flatMap((p) => p.items)
+
+  const { data: following, isLoading: followingLoading } = useQuery({
     queryKey: ['following'],
     queryFn: async () => {
       const token = await getAppToken()
@@ -32,8 +46,12 @@ export function ExplorePage() {
   })
   const followingIds = new Set(following?.map((f) => f.influencer_id))
 
+  useEffect(() => {
+    if (following) localStorage.setItem(FOLLOWING_STORAGE_KEY, JSON.stringify(following))
+  }, [following])
+
   const q = searchQuery.trim().toLowerCase()
-  const visibleInfluencers = influencers
+  const visibleInfluencers = allInfluencers
     ?.filter(
       (inf) =>
         inf.id !== currentUser?.id &&
@@ -41,6 +59,20 @@ export function ExplorePage() {
         (!q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q)),
     )
     .sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0))
+
+  // Auto-load next page when filtering leaves too few cards visible
+  useEffect(() => {
+    if (
+      !isLoading &&
+      !isFetchingNextPage &&
+      hasNextPage &&
+      !followingLoading &&
+      visibleInfluencers !== undefined &&
+      visibleInfluencers.length < MIN_VISIBLE
+    ) {
+      fetchNextPage()
+    }
+  }, [visibleInfluencers?.length, isLoading, isFetchingNextPage, hasNextPage, followingLoading, fetchNextPage])
 
   const { data: selectedPins, isLoading: loadingPins } = useQuery({
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
@@ -124,7 +156,7 @@ export function ExplorePage() {
           </div>
         )}
 
-        {isLoading ? (
+        {isLoading || (!!session && followingLoading) ? (
           <div className="flex justify-center py-16">
             <Spinner />
           </div>
@@ -133,22 +165,39 @@ export function ExplorePage() {
             {q ? 'No curators match your search.' : 'No influencers yet.'}
           </p>
         ) : session ? (
-          <section className="grid grid-cols-2 lg:grid-cols-3 gap-gutter">
-            {visibleInfluencers.map((inf) => (
-              <InfluencerCard
-                key={inf.id}
-                influencer={inf}
-                following={followingIds.has(inf.id)}
-                selected={selectedInfluencer?.id === inf.id}
-                onSelect={() => setSelectedInfluencer(inf)}
-                onFollowClick={() => handleFollowClick(inf.id)}
-                pending={
-                  (follow.isPending && follow.variables === inf.id) ||
-                  (unfollow.isPending && unfollow.variables === inf.id)
-                }
-              />
-            ))}
-          </section>
+          <>
+            <section className="grid grid-cols-2 lg:grid-cols-3 gap-gutter">
+              {visibleInfluencers.map((inf) => (
+                <InfluencerCard
+                  key={inf.id}
+                  influencer={inf}
+                  following={followingIds.has(inf.id)}
+                  selected={selectedInfluencer?.id === inf.id}
+                  onSelect={() => setSelectedInfluencer(inf)}
+                  onFollowClick={() => handleFollowClick(inf.id)}
+                  pending={
+                    (follow.isPending && follow.variables === inf.id) ||
+                    (unfollow.isPending && unfollow.variables === inf.id)
+                  }
+                />
+              ))}
+            </section>
+            {isFetchingNextPage && (
+              <div className="flex justify-center py-8">
+                <Spinner />
+              </div>
+            )}
+            {!isFetchingNextPage && hasNextPage && visibleInfluencers.length >= MIN_VISIBLE && (
+              <div className="flex justify-center pt-8">
+                <button
+                  onClick={() => fetchNextPage()}
+                  className="border border-outline text-on-surface font-label-caps text-label-caps uppercase tracking-wider px-8 py-3 hover:bg-primary hover:text-on-primary hover:border-primary transition-colors"
+                >
+                  Load more
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div>
             <div className="flex items-center justify-between mb-5">

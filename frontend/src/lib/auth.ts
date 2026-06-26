@@ -7,6 +7,7 @@ import { queryClient } from './queryClient'
 const USER_SCOPED_QUERY_KEYS = ['following', 'saved-pins', 'feed', 'me']
 
 const ME_STORAGE_KEY = 'nxtspot_me'
+export const FOLLOWING_STORAGE_KEY = 'nxtspot_following'
 
 let appToken: string | null = null
 let exchange: Promise<string> | null = null
@@ -38,6 +39,10 @@ supabase.auth.onAuthStateChange((_event, session) => {
         handle: null,
       })
     }
+    const storedFollowing = localStorage.getItem(FOLLOWING_STORAGE_KEY)
+    if (storedFollowing) {
+      try { queryClient.setQueryData(['following'], JSON.parse(storedFollowing)) } catch { /* ignore */ }
+    }
     exchange = exchangeForAppToken(session.access_token).catch((err) => {
       appToken = null
       throw err
@@ -46,6 +51,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
     appToken = null
     exchange = null
     localStorage.removeItem(ME_STORAGE_KEY)
+    localStorage.removeItem(FOLLOWING_STORAGE_KEY)
     for (const key of USER_SCOPED_QUERY_KEYS) {
       queryClient.removeQueries({ queryKey: [key] })
     }

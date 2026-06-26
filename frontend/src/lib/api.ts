@@ -53,6 +53,11 @@ export interface Influencer {
   follower_count: number
 }
 
+export interface InfluencerPage {
+  items: Influencer[]
+  has_more: boolean
+}
+
 export interface UserProfile {
   id: string
   email: string
@@ -96,7 +101,8 @@ export const influencersApi = {
   getByHandle: (handle: string) =>
     apiFetch<Influencer>(`/influencers/${handle}`),
 
-  getAll: () => apiFetch<Influencer[]>('/influencers'),
+  getPage: (limit: number, offset: number) =>
+    apiFetch<InfluencerPage>(`/influencers?limit=${limit}&offset=${offset}`),
 }
 
 // ---------- Feed ----------
