@@ -43,10 +43,15 @@ supabase.auth.onAuthStateChange((_event, session) => {
     if (storedFollowing) {
       try { queryClient.setQueryData(['following'], JSON.parse(storedFollowing)) } catch { /* ignore */ }
     }
-    exchange = exchangeForAppToken(session.access_token).catch((err) => {
-      appToken = null
-      throw err
-    })
+    // Only exchange if we don't already have a valid app token.
+    // Supabase fires TOKEN_REFRESHED on tab focus which would otherwise
+    // hit POST /auth/login on every tab switch.
+    if (!appToken && !exchange) {
+      exchange = exchangeForAppToken(session.access_token).catch((err) => {
+        appToken = null
+        throw err
+      })
+    }
   } else {
     appToken = null
     exchange = null
