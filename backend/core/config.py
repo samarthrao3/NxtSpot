@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     supabase_service_key: str
     jwt_secret: str
 
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:4173"]
 
 
 settings = Settings()
