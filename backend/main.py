@@ -13,7 +13,7 @@ from modules.feed.router import router as feed_router
 from modules.subscriptions.router import router as subscriptions_router
 from modules.media.router import router as media_router
 
-app = FastAPI(title="Bangalore Food Map API", version="0.1.0")
+app = FastAPI(title="Bangalore Food Map API", version="0.1.0", redirect_slashes=False)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
