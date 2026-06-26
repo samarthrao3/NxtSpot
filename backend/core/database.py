@@ -5,17 +5,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 from core.config import settings
 
-# Ensure asyncpg driver is used and normalise postgres:// → postgresql+asyncpg://
-_db_url = settings.database_url.replace("postgresql://", "postgresql+asyncpg://").replace("postgres://", "postgresql+asyncpg://")
-
-engine = create_async_engine(
-    _db_url,
-    echo=False,
-    pool_pre_ping=True,
-    connect_args={
-        "statement_cache_size": 0,  # Required for PgBouncer transaction-mode pooler
-    },
-)
+engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
