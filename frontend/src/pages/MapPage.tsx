@@ -99,44 +99,18 @@ export function MapPage() {
     },
   })
 
-  const { data: feedGroups, isLoading } = useQuery({
+  const { data: restaurantGroups, isLoading } = useQuery({
     queryKey: ['feed'],
     queryFn: async () => {
       const token = await getAppToken()
       return feedApi.get(token)
     },
   })
-  const pins = useMemo(() => feedGroups?.flatMap((group) => group.pins), [feedGroups])
 
   const { data: ownPins } = useQuery({
     queryKey: ['pins', 'influencer', currentUser?.id],
     queryFn: () => pinsApi.getByInfluencer(currentUser!.id),
     enabled: currentUser?.role === 'influencer',
-  })
-
-  // Adds the influencer's own pins, plus a saved pin we've been asked to focus on
-  // even if its influencer isn't followed
-  const markerPins = useMemo(() => {
-    const result = [...(pins ?? [])]
-    const addIfMissing = (p?: Pin) => {
-      if (p && !result.some((r) => r.id === p.id)) result.push(p)
-    }
-    ownPins?.forEach(addIfMissing)
-    addIfMissing(focusPin)
-    return result
-  }, [pins, ownPins, focusPin])
-
-  const visibleMarkerPins = useMemo(
-    () => (markerPins ?? []).filter((p) => !hiddenIds.has(p.influencer_id)),
-    [markerPins, hiddenIds],
-  )
-
-  const { data: following } = useQuery({
-    queryKey: ['following'],
-    queryFn: async () => {
-      const token = await getAppToken()
-      return subscriptionsApi.getFollowing(token)
-    },
   })
 
   const { data: followingInfluencers = [] } = useQuery({
@@ -146,25 +120,6 @@ export function MapPage() {
       return subscriptionsApi.getFollowingInfluencers(token)
     },
   })
-
-  const followingIds = new Set(following?.map((f) => f.influencer_id))
-
-  const markerGroups = useMemo(() => {
-    const groups = new Map<string, Pin[]>()
-    for (const pin of visibleMarkerPins) {
-      const key = pin.restaurant_name.toLowerCase().trim()
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(pin)
-    }
-    // Guarantee the representative pin (group[0]) belongs to a currently-followed
-    // influencer. Without this, unfollowing the first-pinned influencer drops the
-    // whole group from the map even when other followed members remain.
-    return Array.from(groups.values()).map((group) => {
-      const followedIdx = group.findIndex((p) => followingIds.has(p.influencer_id))
-      if (followedIdx <= 0) return group
-      return [group[followedIdx], ...group.slice(0, followedIdx), ...group.slice(followedIdx + 1)]
-    })
-  }, [visibleMarkerPins, following])
 
   const followedInfluencers = followingInfluencers
 
@@ -180,16 +135,18 @@ export function MapPage() {
     },
   })
 
+  // The backend groups pins by restaurant — no frontend string matching needed.
+  // spotterInfluencers finds the group for the selected pin and maps its visible
+  // pins (not toggled off) to followed influencer objects for the spotters panel.
   const spotterInfluencers = useMemo(() => {
-    if (!selectedPin) return []
-    const normalizedName = selectedPin.restaurant_name.toLowerCase().trim()
-    const pinnerIds = new Set(
-      visibleMarkerPins
-        .filter((p) => p.restaurant_name.toLowerCase().trim() === normalizedName)
-        .map((p) => p.influencer_id),
-    )
+    if (!selectedPin || !restaurantGroups) return []
+    const key = selectedPin.restaurant_name.toLowerCase().trim()
+    const group = restaurantGroups.find((g) => g.restaurant_key === key)
+    if (!group) return []
+    const visiblePins = group.pins.filter((p) => !hiddenIds.has(p.influencer_id))
+    const pinnerIds = new Set(visiblePins.map((p) => p.influencer_id))
     return followingInfluencers.filter((inf) => pinnerIds.has(inf.id))
-  }, [selectedPin, visibleMarkerPins, followingInfluencers])
+  }, [selectedPin, restaurantGroups, hiddenIds, followingInfluencers])
 
   // Initialise map
   useEffect(() => {
@@ -221,7 +178,7 @@ export function MapPage() {
     setSelectedPin(focusPin)
   }, [mapReady, focusPin])
 
-  // Drop markers when groups/visibility change — one lightweight circle per restaurant
+  // Drop markers when restaurant groups or visibility change
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!map.current || !mapReady) return
@@ -230,84 +187,101 @@ export function MapPage() {
       popups.current.forEach((p) => p.remove())
       popups.current = []
 
-      markerGroups.forEach((group) => {
-        const representativePin = group[0]
-        const count = group.length
-        const isMulti = count > 1
-        const color = isMulti ? '#99420d' : colorForId(representativePin.influencer_id)
-        const size = isMulti ? 18 : 14
+      // One marker per restaurant group — position is the group's canonical lat/lng
+      // (backend sets this to the first pin received for that restaurant key).
+      restaurantGroups
+        ?.filter((group) => group.pins.some((p) => !hiddenIds.has(p.influencer_id)))
+        .forEach((group) => {
+          const visiblePins = group.pins.filter((p) => !hiddenIds.has(p.influencer_id))
+          const count = visiblePins.length
+          const primary = visiblePins[0]
+          const isMulti = count > 1
+          const color = isMulti ? '#99420d' : colorForId(primary.influencer_id)
+          const size = isMulti ? 18 : 14
 
+          const el = document.createElement('div')
+          el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background-color:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;`
+
+          if (isMulti) {
+            const countEl = document.createElement('span')
+            countEl.style.cssText = 'font-size:9px;font-weight:700;color:#ffffff;line-height:1;pointer-events:none;'
+            countEl.textContent = String(count)
+            el.appendChild(countEl)
+          }
+
+          // Desktop-only hover popup: restaurant name + spotter count, no images
+          const hoverEl = document.createElement('div')
+          const hoverBody = document.createElement('div')
+          hoverBody.className = 'p-2 flex flex-col gap-1 bg-surface'
+          const hoverTitle = document.createElement('p')
+          hoverTitle.className = 'font-headline-sm text-headline-sm text-on-surface m-0'
+          hoverTitle.textContent = primary.restaurant_name
+          hoverBody.appendChild(hoverTitle)
+          if (isMulti) {
+            const spotterLine = document.createElement('p')
+            spotterLine.className = 'font-label-caps text-label-caps text-secondary uppercase m-0'
+            spotterLine.textContent = `${count} curators recommended this`
+            hoverBody.appendChild(spotterLine)
+          }
+          hoverEl.appendChild(hoverBody)
+
+          const hoverPopup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 10,
+            maxWidth: '200px',
+          }).setDOMContent(hoverEl)
+          popups.current.push(hoverPopup)
+
+          let hoverTimeout: ReturnType<typeof setTimeout> | null = null
+          const showPopup = () => {
+            if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
+            if (!hoverPopup.isOpen()) {
+              hoverPopup.setLngLat([group.lng, group.lat]).addTo(map.current!)
+            }
+            const popupEl = hoverPopup.getElement()
+            if (popupEl && !popupEl.dataset.listenersAttached) {
+              popupEl.dataset.listenersAttached = 'true'
+              popupEl.addEventListener('mouseenter', showPopup)
+              popupEl.addEventListener('mouseleave', hidePopup)
+            }
+          }
+          const hidePopup = () => {
+            hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
+          }
+
+          el.addEventListener('mouseenter', () => {
+            if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
+          })
+          el.addEventListener('mouseleave', () => {
+            if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
+          })
+          el.addEventListener('click', () => {
+            hoverPopup.remove()
+            setSelectedPin(primary)
+            if (isMulti) setSpottersPanelOpen(true)
+          })
+
+          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+            .setLngLat([group.lng, group.lat])
+            .addTo(map.current!)
+          markers.current.push(marker)
+        })
+
+      // Influencer's own pins — not in the feed (self-follow is blocked by the backend)
+      ownPins?.forEach((pin) => {
+        if (hiddenIds.has(pin.influencer_id)) return
         const el = document.createElement('div')
-        el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background-color:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;`
-
-        if (isMulti) {
-          const countEl = document.createElement('span')
-          countEl.style.cssText = 'font-size:9px;font-weight:700;color:#ffffff;line-height:1;pointer-events:none;'
-          countEl.textContent = String(count)
-          el.appendChild(countEl)
-        }
-
-        // Desktop-only hover popup: restaurant name + spotter count, no images
-        const hoverEl = document.createElement('div')
-        const hoverBody = document.createElement('div')
-        hoverBody.className = 'p-2 flex flex-col gap-1 bg-surface'
-        const hoverTitle = document.createElement('p')
-        hoverTitle.className = 'font-headline-sm text-headline-sm text-on-surface m-0'
-        hoverTitle.textContent = representativePin.restaurant_name
-        hoverBody.appendChild(hoverTitle)
-        if (isMulti) {
-          const spotterLine = document.createElement('p')
-          spotterLine.className = 'font-label-caps text-label-caps text-secondary uppercase m-0'
-          spotterLine.textContent = `${count} curators recommended this`
-          hoverBody.appendChild(spotterLine)
-        }
-        hoverEl.appendChild(hoverBody)
-
-        const hoverPopup = new mapboxgl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 10,
-          maxWidth: '200px',
-        }).setDOMContent(hoverEl)
-        popups.current.push(hoverPopup)
-
-        let hoverTimeout: ReturnType<typeof setTimeout> | null = null
-        const showPopup = () => {
-          if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
-          if (!hoverPopup.isOpen()) {
-            hoverPopup.setLngLat([representativePin.lng, representativePin.lat]).addTo(map.current!)
-          }
-          const popupEl = hoverPopup.getElement()
-          if (popupEl && !popupEl.dataset.listenersAttached) {
-            popupEl.dataset.listenersAttached = 'true'
-            popupEl.addEventListener('mouseenter', showPopup)
-            popupEl.addEventListener('mouseleave', hidePopup)
-          }
-        }
-        const hidePopup = () => {
-          hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
-        }
-
-        el.addEventListener('mouseenter', () => {
-          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
-        })
-        el.addEventListener('mouseleave', () => {
-          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
-        })
-        el.addEventListener('click', () => {
-          hoverPopup.remove()
-          setSelectedPin(representativePin)
-          if (isMulti) setSpottersPanelOpen(true)
-        })
-
+        el.style.cssText = `width:14px;height:14px;border-radius:50%;background-color:${colorForId(pin.influencer_id)};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;`
+        el.addEventListener('click', () => setSelectedPin(pin))
         const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-          .setLngLat([representativePin.lng, representativePin.lat])
+          .setLngLat([pin.lng, pin.lat])
           .addTo(map.current!)
         markers.current.push(marker)
       })
     }, 100)
     return () => clearTimeout(timer)
-  }, [markerGroups, mapReady])
+  }, [restaurantGroups, ownPins, hiddenIds, mapReady])
 
   const tryPlaceLocation = (lat: number, lng: number, name?: string) => {
     if (
@@ -493,7 +467,7 @@ export function MapPage() {
               Loading pins…
             </div>
           )}
-          {!isLoading && pins?.length === 0 && (
+          {!isLoading && (restaurantGroups?.length ?? 0) === 0 && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-surface border border-outline-variant px-4 py-2 font-body-base text-body-base text-secondary">
               Follow some influencers on Discover to see their pins here
             </div>
@@ -615,9 +589,10 @@ export function MapPage() {
                       )}
                     </div>
                     {(() => {
-                      const count = markerPins?.filter(
-                        p => p.restaurant_name.toLowerCase() === selectedPin.restaurant_name.toLowerCase()
-                      ).length ?? 1
+                      const group = restaurantGroups?.find(
+                        (g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim()
+                      )
+                      const count = group?.pins.filter((p) => !hiddenIds.has(p.influencer_id)).length ?? 1
                       return (
                         <button
                           onClick={() => setSpottersPanelOpen(true)}

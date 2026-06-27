@@ -1,5 +1,4 @@
 import json
-import uuid
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -9,8 +8,7 @@ from core.database import get_db
 from core.redis import get_redis
 from models import Pin, Subscription, User
 from modules.auth.deps import get_current_user
-from modules.pins.schemas import PinOut
-from .schemas import FeedGroup
+from .schemas import PinWithInfluencer, RestaurantGroup
 
 router = APIRouter()
 
@@ -18,18 +16,18 @@ _TTL = 120  # 2 min
 _PINS_PER_INFLUENCER = 20
 
 
-@router.get("", response_model=list[FeedGroup])
+@router.get("", response_model=list[RestaurantGroup])
 async def get_feed(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[FeedGroup]:
+) -> list[RestaurantGroup]:
     redis = await get_redis()
     cache_key = f"feed_pins:{current_user.id}"
     cached = await redis.get(cache_key)
     if cached:
         return json.loads(cached)
 
-    # Single JOIN query: latest _PINS_PER_INFLUENCER pins per followed influencer
+    # Latest _PINS_PER_INFLUENCER pins per followed influencer
     ranked = (
         select(
             Pin.id,
@@ -50,13 +48,19 @@ async def get_feed(
         .order_by(Pin.created_at.desc())
     )
 
-    groups: list[FeedGroup] = []
-    grouped: dict[uuid.UUID, list[PinOut]] = {}
+    restaurant_groups: dict[str, RestaurantGroup] = {}
     for pin in pins_result.scalars().all():
-        grouped.setdefault(pin.influencer_id, []).append(PinOut.model_validate(pin))
-    if grouped:
-        groups = [FeedGroup(influencer_id=iid, pins=pins) for iid, pins in grouped.items()]
+        key = pin.restaurant_name.lower().strip()
+        if key not in restaurant_groups:
+            restaurant_groups[key] = RestaurantGroup(
+                restaurant_key=key,
+                lat=pin.lat,
+                lng=pin.lng,
+                pins=[],
+            )
+        restaurant_groups[key].pins.append(PinWithInfluencer.model_validate(pin))
 
+    groups = list(restaurant_groups.values())
     data = [g.model_dump(mode="json") for g in groups]
     await redis.set(cache_key, json.dumps(data), ex=_TTL)
     return data

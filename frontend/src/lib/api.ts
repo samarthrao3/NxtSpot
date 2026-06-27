@@ -107,13 +107,15 @@ export const influencersApi = {
 
 // ---------- Feed ----------
 
-export interface FeedGroup {
-  influencer_id: string
+export interface RestaurantGroup {
+  restaurant_key: string
+  lat: number
+  lng: number
   pins: Pin[]
 }
 
 export const feedApi = {
-  get: (token: string) => apiFetch<FeedGroup[]>('/feed', { token }),
+  get: (token: string) => apiFetch<RestaurantGroup[]>('/feed', { token }),
 }
 
 // ---------- Subscriptions ----------
