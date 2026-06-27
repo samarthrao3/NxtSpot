@@ -32,6 +32,7 @@ export function ExplorePage() {
     initialPageParam: 0,
     getNextPageParam: (lastPage, _all, lastPageParam) =>
       lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
+    staleTime: 5 * 60 * 1000,
   })
 
   const allInfluencers = pages?.pages.flatMap((p) => p.items)
@@ -78,6 +79,7 @@ export function ExplorePage() {
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
     queryFn: () => pinsApi.getByInfluencer(selectedInfluencer!.id),
     enabled: !!selectedInfluencer,
+    staleTime: 5 * 60 * 1000,
   })
 
   const follow = useMutation({

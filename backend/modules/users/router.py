@@ -72,12 +72,12 @@ async def delete_me(
 @router.get("/me/saved", response_model=list[PinOut], summary="All pins the current user has saved")
 async def get_saved_pins(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> list[PinOut]:
     result = await db.execute(
         select(Pin)
         .join(SavedPin, SavedPin.pin_id == Pin.id)
-        .where(SavedPin.user_id == current_user.id)
+        .where(SavedPin.user_id == current_user_id)
     )
     return [PinOut.model_validate(p) for p in result.scalars().all()]
 

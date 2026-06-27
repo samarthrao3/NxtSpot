@@ -30,6 +30,7 @@ export function FollowingPage() {
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
     queryFn: () => pinsApi.getByInfluencer(selectedInfluencer!.id),
     enabled: !!selectedInfluencer,
+    staleTime: 5 * 60 * 1000,
   })
 
   const unfollow = useMutation({

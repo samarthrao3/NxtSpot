@@ -1,4 +1,5 @@
 import json
+import uuid
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.redis import get_redis
 from models import Pin, Subscription, User
-from modules.auth.deps import get_current_user
+from modules.auth.deps import get_current_user_id
 from .schemas import PinWithInfluencer, RestaurantGroup
 
 router = APIRouter()
@@ -19,10 +20,10 @@ _PINS_PER_INFLUENCER = 20
 @router.get("", response_model=list[RestaurantGroup])
 async def get_feed(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> list[RestaurantGroup]:
     redis = await get_redis()
-    cache_key = f"feed_pins:{current_user.id}"
+    cache_key = f"feed_pins:{current_user_id}"
     cached = await redis.get(cache_key)
     if cached:
         return json.loads(cached)
@@ -37,7 +38,7 @@ async def get_feed(
             ).label("rn"),
         )
         .join(Subscription, Subscription.influencer_id == Pin.influencer_id)
-        .where(Subscription.user_id == current_user.id)
+        .where(Subscription.user_id == current_user_id)
         .subquery()
     )
 

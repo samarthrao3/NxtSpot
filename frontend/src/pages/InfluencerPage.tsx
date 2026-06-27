@@ -27,12 +27,14 @@ export function InfluencerPage() {
     queryKey: ['influencer', handle],
     queryFn: () => influencersApi.getByHandle(handle!),
     enabled: !!handle,
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: pins, isLoading: loadingPins } = useQuery({
     queryKey: ['pins', 'influencer', influencer?.id],
     queryFn: () => pinsApi.getByInfluencer(influencer!.id),
     enabled: !!influencer?.id,
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: savedPins } = useQuery({
