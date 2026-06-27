@@ -1,7 +1,8 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -72,18 +73,16 @@ async def follow(
 ) -> None:
     if influencer_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
-    existing = await db.execute(
-        select(Subscription).where(
-            Subscription.user_id == current_user.id,
-            Subscription.influencer_id == influencer_id,
-        )
+    stmt = (
+        pg_insert(Subscription)
+        .values(user_id=current_user.id, influencer_id=influencer_id)
+        .on_conflict_do_nothing()
     )
-    if existing.scalar_one_or_none():
+    result = await db.execute(stmt)
+    await db.commit()
+    if result.rowcount == 0:
         response.status_code = 200
         return
-    sub = Subscription(user_id=current_user.id, influencer_id=influencer_id)
-    db.add(sub)
-    await db.commit()
     redis = await get_redis()
     await redis.delete(f"feed_pins:{current_user.id}")
 
@@ -96,16 +95,14 @@ async def unfollow(
     current_user: User = Depends(get_current_user),
 ) -> None:
     result = await db.execute(
-        select(Subscription).where(
+        delete(Subscription).where(
             Subscription.user_id == current_user.id,
             Subscription.influencer_id == influencer_id,
         )
     )
-    sub = result.scalar_one_or_none()
-    if sub is None:
+    await db.commit()
+    if result.rowcount == 0:
         response.status_code = 200
         return
-    await db.delete(sub)
-    await db.commit()
     redis = await get_redis()
     await redis.delete(f"feed_pins:{current_user.id}")

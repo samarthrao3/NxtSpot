@@ -113,15 +113,13 @@ export function MapPage() {
     enabled: currentUser?.role === 'influencer',
   })
 
-  const { data: followingInfluencers = [] } = useQuery({
+  const { data: followedInfluencers = [] } = useQuery({
     queryKey: ['following-influencers'],
     queryFn: async () => {
       const token = await getAppToken()
       return subscriptionsApi.getFollowingInfluencers(token)
     },
   })
-
-  const followedInfluencers = followingInfluencers
 
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
@@ -135,9 +133,6 @@ export function MapPage() {
     },
   })
 
-  // The backend groups pins by restaurant — no frontend string matching needed.
-  // spotterInfluencers finds the group for the selected pin and maps its visible
-  // pins (not toggled off) to followed influencer objects for the spotters panel.
   const spotterInfluencers = useMemo(() => {
     if (!selectedPin || !restaurantGroups) return []
     const key = selectedPin.restaurant_name.toLowerCase().trim()
@@ -145,8 +140,8 @@ export function MapPage() {
     if (!group) return []
     const visiblePins = group.pins.filter((p) => !hiddenIds.has(p.influencer_id))
     const pinnerIds = new Set(visiblePins.map((p) => p.influencer_id))
-    return followingInfluencers.filter((inf) => pinnerIds.has(inf.id))
-  }, [selectedPin, restaurantGroups, hiddenIds, followingInfluencers])
+    return followedInfluencers.filter((inf) => pinnerIds.has(inf.id))
+  }, [selectedPin, restaurantGroups, hiddenIds, followedInfluencers])
 
   // Initialise map
   useEffect(() => {
@@ -241,7 +236,6 @@ export function MapPage() {
           el.appendChild(svg)
 
           // Desktop-only hover popup: restaurant name + spotter count, no images
-          const hoverEl = document.createElement('div')
           const hoverBody = document.createElement('div')
           hoverBody.className = 'p-2 flex flex-col gap-1 bg-surface'
           const hoverTitle = document.createElement('p')
@@ -254,14 +248,13 @@ export function MapPage() {
             spotterLine.textContent = `${count} curators recommended this`
             hoverBody.appendChild(spotterLine)
           }
-          hoverEl.appendChild(hoverBody)
 
           const hoverPopup = new mapboxgl.Popup({
             closeButton: false,
             closeOnClick: false,
             offset: [0, -pinH] as [number, number],
             maxWidth: '200px',
-          }).setDOMContent(hoverEl)
+          }).setDOMContent(hoverBody)
           popups.current.push(hoverPopup)
 
           let hoverTimeout: ReturnType<typeof setTimeout> | null = null
