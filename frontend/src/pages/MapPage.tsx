@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
-import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
+import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_MAX_BOUNDS, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
 import { feedApi, influencersApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { useCurrentUser } from '@/lib/useCurrentUser'
@@ -142,9 +142,6 @@ export function MapPage() {
   const PAGE_SIZE = 12
   const {
     data: influencerPages,
-    isFetchingNextPage: fetchingInfluencers,
-    fetchNextPage: fetchInfluencerPage,
-    hasNextPage: hasMoreInfluencers,
   } = useInfiniteQuery({
     queryKey: ['influencers'],
     queryFn: ({ pageParam }) => influencersApi.getPage(PAGE_SIZE, pageParam),
@@ -152,10 +149,6 @@ export function MapPage() {
     getNextPageParam: (lastPage, _all, lastPageParam) =>
       lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
   })
-
-  useEffect(() => {
-    if (hasMoreInfluencers && !fetchingInfluencers) fetchInfluencerPage()
-  }, [hasMoreInfluencers, fetchingInfluencers, fetchInfluencerPage])
 
   const allInfluencers = influencerPages?.pages.flatMap((p) => p.items) ?? []
   const followingIds = new Set(following?.map((f) => f.influencer_id))
@@ -210,6 +203,7 @@ export function MapPage() {
       style: MAP_STYLE,
       center: BANGALORE_CENTER,
       zoom: BANGALORE_DEFAULT_ZOOM,
+      maxBounds: BANGALORE_MAX_BOUNDS,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.current.on('movestart', () => setMapMoving(true))
@@ -231,127 +225,93 @@ export function MapPage() {
     setSelectedPin(focusPin)
   }, [mapReady, focusPin])
 
-  // Drop markers when groups/visibility change — one marker per unique restaurant name
+  // Drop markers when groups/visibility change — one lightweight circle per restaurant
   useEffect(() => {
-    if (!map.current) return
-    markers.current.forEach((m) => m.remove())
-    markers.current = []
-    popups.current.forEach((p) => p.remove())
-    popups.current = []
+    const timer = setTimeout(() => {
+      if (!map.current || !mapReady) return
+      markers.current.forEach((m) => m.remove())
+      markers.current = []
+      popups.current.forEach((p) => p.remove())
+      popups.current = []
 
-    markerGroups.forEach((group) => {
-      const representativePin = group[0]
-      const count = group.length
-      const isMulti = count > 1
-      const influencer = allInfluencers?.find((inf) => inf.id === representativePin.influencer_id)
+      markerGroups.forEach((group) => {
+        const representativePin = group[0]
+        const count = group.length
+        const isMulti = count > 1
+        const color = isMulti ? '#99420d' : colorForId(representativePin.influencer_id)
+        const size = isMulti ? 18 : 14
 
-      const el = document.createElement('div')
-      el.className = 'flex flex-col items-center cursor-pointer'
+        const el = document.createElement('div')
+        el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background-color:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;`
 
-      const avatar = document.createElement('div')
-      if (isMulti) {
-        // Warm peach dot with count centered — matches the editorial terracotta palette
-        avatar.className =
-          'w-9 h-9 rounded-full border-2 border-white flex items-center justify-center hover:scale-110 transition-transform'
-        avatar.style.backgroundColor = '#99420d'
-        avatar.style.boxShadow = '0 1px 4px rgba(0,0,0,0.35)'
-
-        const countEl = document.createElement('span')
-        countEl.style.cssText = 'font-size:12px;font-weight:700;color:#ffffff;line-height:1;'
-        countEl.textContent = String(count)
-        avatar.appendChild(countEl)
-      } else {
-        const color = colorForId(representativePin.influencer_id)
-        avatar.className =
-          'w-9 h-9 rounded-full border-2 border-white overflow-hidden flex items-center justify-center hover:scale-110 transition-transform'
-        avatar.style.backgroundColor = color
-        avatar.style.boxShadow = '0 1px 4px rgba(0,0,0,0.35)'
-        if (influencer?.avatar_url) {
-          const img = document.createElement('img')
-          img.src = influencer.avatar_url
-          img.referrerPolicy = 'no-referrer'
-          img.className = 'w-full h-full object-cover'
-          avatar.appendChild(img)
-        } else {
-          const initial = document.createElement('span')
-          initial.className = 'text-white font-label-caps text-label-caps'
-          initial.textContent = (influencer?.name ?? '?').charAt(0).toUpperCase()
-          avatar.appendChild(initial)
+        if (isMulti) {
+          const countEl = document.createElement('span')
+          countEl.style.cssText = 'font-size:9px;font-weight:700;color:#ffffff;line-height:1;pointer-events:none;'
+          countEl.textContent = String(count)
+          el.appendChild(countEl)
         }
-      }
 
-      const tailColor = isMulti ? '#99420d' : colorForId(representativePin.influencer_id)
-      const tail = document.createElement('div')
-      tail.style.width = '0'
-      tail.style.height = '0'
-      tail.style.marginTop = '-2px'
-      tail.style.borderLeft = '5px solid transparent'
-      tail.style.borderRight = '5px solid transparent'
-      tail.style.borderTop = `7px solid ${tailColor}`
-
-      el.appendChild(avatar)
-      el.appendChild(tail)
-
-      // Hover popup: no images — restaurant name and (for multi) spotter count
-      const hoverEl = document.createElement('div')
-      hoverEl.className = 'w-48 bg-surface'
-      const hoverBody = document.createElement('div')
-      hoverBody.className = 'p-3 flex flex-col gap-1'
-      const hoverTitle = document.createElement('p')
-      hoverTitle.className = 'font-headline-sm text-headline-sm text-on-surface m-0'
-      hoverTitle.textContent = representativePin.restaurant_name
-      hoverBody.appendChild(hoverTitle)
-      if (isMulti) {
-        const spotterLine = document.createElement('p')
-        spotterLine.className = 'font-label-caps text-label-caps text-secondary uppercase m-0'
-        spotterLine.textContent = `${count} curators recommended this`
-        hoverBody.appendChild(spotterLine)
-      }
-      hoverEl.appendChild(hoverBody)
-
-      const hoverPopup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        offset: 24,
-        maxWidth: '220px',
-      }).setDOMContent(hoverEl)
-      popups.current.push(hoverPopup)
-
-      let hoverTimeout: ReturnType<typeof setTimeout> | null = null
-      const showPopup = () => {
-        if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
-        if (!hoverPopup.isOpen()) {
-          hoverPopup.setLngLat([representativePin.lng, representativePin.lat]).addTo(map.current!)
+        // Desktop-only hover popup: restaurant name + spotter count, no images
+        const hoverEl = document.createElement('div')
+        const hoverBody = document.createElement('div')
+        hoverBody.className = 'p-2 flex flex-col gap-1 bg-surface'
+        const hoverTitle = document.createElement('p')
+        hoverTitle.className = 'font-headline-sm text-headline-sm text-on-surface m-0'
+        hoverTitle.textContent = representativePin.restaurant_name
+        hoverBody.appendChild(hoverTitle)
+        if (isMulti) {
+          const spotterLine = document.createElement('p')
+          spotterLine.className = 'font-label-caps text-label-caps text-secondary uppercase m-0'
+          spotterLine.textContent = `${count} curators recommended this`
+          hoverBody.appendChild(spotterLine)
         }
-        const popupEl = hoverPopup.getElement()
-        if (popupEl && !popupEl.dataset.listenersAttached) {
-          popupEl.dataset.listenersAttached = 'true'
-          popupEl.addEventListener('mouseenter', showPopup)
-          popupEl.addEventListener('mouseleave', hidePopup)
+        hoverEl.appendChild(hoverBody)
+
+        const hoverPopup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 10,
+          maxWidth: '200px',
+        }).setDOMContent(hoverEl)
+        popups.current.push(hoverPopup)
+
+        let hoverTimeout: ReturnType<typeof setTimeout> | null = null
+        const showPopup = () => {
+          if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
+          if (!hoverPopup.isOpen()) {
+            hoverPopup.setLngLat([representativePin.lng, representativePin.lat]).addTo(map.current!)
+          }
+          const popupEl = hoverPopup.getElement()
+          if (popupEl && !popupEl.dataset.listenersAttached) {
+            popupEl.dataset.listenersAttached = 'true'
+            popupEl.addEventListener('mouseenter', showPopup)
+            popupEl.addEventListener('mouseleave', hidePopup)
+          }
         }
-      }
-      const hidePopup = () => {
-        hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
-      }
+        const hidePopup = () => {
+          hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
+        }
 
-      el.addEventListener('mouseenter', () => {
-        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
-      })
-      el.addEventListener('mouseleave', () => {
-        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
-      })
-      el.addEventListener('click', () => {
-        hoverPopup.remove()
-        setSelectedPin(representativePin)
-        if (isMulti) setSpottersPanelOpen(true)
-      })
+        el.addEventListener('mouseenter', () => {
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
+        })
+        el.addEventListener('mouseleave', () => {
+          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
+        })
+        el.addEventListener('click', () => {
+          hoverPopup.remove()
+          setSelectedPin(representativePin)
+          if (isMulti) setSpottersPanelOpen(true)
+        })
 
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([representativePin.lng, representativePin.lat])
-        .addTo(map.current!)
-      markers.current.push(marker)
-    })
-  }, [markerGroups, allInfluencers])
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([representativePin.lng, representativePin.lat])
+          .addTo(map.current!)
+        markers.current.push(marker)
+      })
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [markerGroups, mapReady])
 
   const tryPlaceLocation = (lat: number, lng: number, name?: string) => {
     if (
