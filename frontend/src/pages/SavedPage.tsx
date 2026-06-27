@@ -24,7 +24,16 @@ export function SavedPage() {
       const token = await getAppToken()
       return savedPinsApi.unsave(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData(['saved-pins'])
+      qc.setQueryData<typeof pins>(['saved-pins'], (old) => (old ?? []).filter((p) => p.id !== pinId))
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
 
   return (
