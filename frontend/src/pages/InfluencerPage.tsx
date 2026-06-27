@@ -50,14 +50,33 @@ export function InfluencerPage() {
       const token = await getAppToken()
       return savedPinsApi.save(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData<Pin[]>(['saved-pins'])
+      const pin = pins?.find((p) => p.id === pinId)
+      if (pin) qc.setQueryData<Pin[]>(['saved-pins'], (old) => [...(old ?? []), pin])
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
   const unsave = useMutation({
     mutationFn: async (pinId: string) => {
       const token = await getAppToken()
       return savedPinsApi.unsave(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData<Pin[]>(['saved-pins'])
+      qc.setQueryData<Pin[]>(['saved-pins'], (old) => (old ?? []).filter((p) => p.id !== pinId))
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
 
   const handleSaveToggle = (pinId: string) => {
