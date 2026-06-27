@@ -85,7 +85,19 @@ export function ExplorePage() {
       const token = await getAppToken()
       return subscriptionsApi.follow(influencerId, token)
     },
-    onSuccess: () => {
+    onMutate: async (influencerId) => {
+      await qc.cancelQueries({ queryKey: ['following'] })
+      const previous = qc.getQueryData<{ influencer_id: string }[]>(['following'])
+      qc.setQueryData<{ influencer_id: string }[]>(['following'], (old) => [
+        ...(old ?? []),
+        { influencer_id: influencerId },
+      ])
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['following'], context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
@@ -96,7 +108,18 @@ export function ExplorePage() {
       const token = await getAppToken()
       return subscriptionsApi.unfollow(influencerId, token)
     },
-    onSuccess: () => {
+    onMutate: async (influencerId) => {
+      await qc.cancelQueries({ queryKey: ['following'] })
+      const previous = qc.getQueryData<{ influencer_id: string }[]>(['following'])
+      qc.setQueryData<{ influencer_id: string }[]>(['following'], (old) =>
+        (old ?? []).filter((f) => f.influencer_id !== influencerId),
+      )
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['following'], context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })

@@ -37,11 +37,22 @@ export function FollowingPage() {
       const token = await getAppToken()
       return subscriptionsApi.unfollow(influencerId, token)
     },
-    onSuccess: (_, influencerId) => {
+    onMutate: async (influencerId) => {
+      await qc.cancelQueries({ queryKey: ['following-influencers'] })
+      const previous = qc.getQueryData<Influencer[]>(['following-influencers'])
+      qc.setQueryData<Influencer[]>(['following-influencers'], (old) =>
+        (old ?? []).filter((inf) => inf.id !== influencerId),
+      )
+      if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['following-influencers'], context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
-      if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
     },
   })
 

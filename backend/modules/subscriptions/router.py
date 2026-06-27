@@ -1,14 +1,14 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from core.redis import get_redis
+from core.redis import invalidate_feed
 from models import Pin, Subscription, User
-from modules.auth.deps import get_current_user
+from modules.auth.deps import get_current_user, get_current_user_id
 from .schemas import FollowingOut, FollowingInfluencerOut
 
 router = APIRouter()
@@ -68,14 +68,15 @@ async def list_following_influencers(
 async def follow(
     influencer_id: uuid.UUID,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> None:
-    if influencer_id == current_user.id:
+    if influencer_id == current_user_id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     stmt = (
         pg_insert(Subscription)
-        .values(user_id=current_user.id, influencer_id=influencer_id)
+        .values(user_id=current_user_id, influencer_id=influencer_id)
         .on_conflict_do_nothing()
     )
     result = await db.execute(stmt)
@@ -83,20 +84,20 @@ async def follow(
     if result.rowcount == 0:
         response.status_code = 200
         return
-    redis = await get_redis()
-    await redis.delete(f"feed_pins:{current_user.id}")
+    background_tasks.add_task(invalidate_feed, str(current_user_id))
 
 
 @router.delete("/{influencer_id}", status_code=204)
 async def unfollow(
     influencer_id: uuid.UUID,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> None:
     result = await db.execute(
         delete(Subscription).where(
-            Subscription.user_id == current_user.id,
+            Subscription.user_id == current_user_id,
             Subscription.influencer_id == influencer_id,
         )
     )
@@ -104,5 +105,4 @@ async def unfollow(
     if result.rowcount == 0:
         response.status_code = 200
         return
-    redis = await get_redis()
-    await redis.delete(f"feed_pins:{current_user.id}")
+    background_tasks.add_task(invalidate_feed, str(current_user_id))
