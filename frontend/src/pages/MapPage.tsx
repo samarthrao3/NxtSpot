@@ -126,6 +126,11 @@ export function MapPage() {
     return result
   }, [pins, ownPins, focusPin])
 
+  const visibleMarkerPins = useMemo(
+    () => (markerPins ?? []).filter((p) => !hiddenIds.has(p.influencer_id)),
+    [markerPins, hiddenIds],
+  )
+
   const { data: following } = useQuery({
     queryKey: ['following'],
     queryFn: async () => {
@@ -154,6 +159,24 @@ export function MapPage() {
 
   const allInfluencers = influencerPages?.pages.flatMap((p) => p.items) ?? []
   const followingIds = new Set(following?.map((f) => f.influencer_id))
+
+  const markerGroups = useMemo(() => {
+    const groups = new Map<string, Pin[]>()
+    for (const pin of visibleMarkerPins) {
+      const key = pin.restaurant_name.toLowerCase().trim()
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(pin)
+    }
+    // Guarantee the representative pin (group[0]) belongs to a currently-followed
+    // influencer. Without this, unfollowing the first-pinned influencer drops the
+    // whole group from the map even when other followed members remain.
+    return Array.from(groups.values()).map((group) => {
+      const followedIdx = group.findIndex((p) => followingIds.has(p.influencer_id))
+      if (followedIdx <= 0) return group
+      return [group[followedIdx], ...group.slice(0, followedIdx), ...group.slice(followedIdx + 1)]
+    })
+  }, [visibleMarkerPins, following])
+
   const followedInfluencers = allInfluencers.filter((inf) => followingIds.has(inf.id))
 
   const unfollow = useMutation({
@@ -169,18 +192,15 @@ export function MapPage() {
   })
 
   const spotterInfluencers = useMemo(() => {
-    if (!selectedPin || !markerPins || !allInfluencers) return []
+    if (!selectedPin || !allInfluencers) return []
+    const normalizedName = selectedPin.restaurant_name.toLowerCase().trim()
     const pinnerIds = new Set(
-      markerPins
-        .filter(
-          p =>
-            p.restaurant_name.toLowerCase() === selectedPin.restaurant_name.toLowerCase() &&
-            followingIds.has(p.influencer_id),
-        )
-        .map(p => p.influencer_id),
+      visibleMarkerPins
+        .filter((p) => p.restaurant_name.toLowerCase().trim() === normalizedName)
+        .map((p) => p.influencer_id),
     )
-    return allInfluencers.filter(inf => pinnerIds.has(inf.id))
-  }, [selectedPin, markerPins, allInfluencers, followingIds])
+    return allInfluencers.filter((inf) => pinnerIds.has(inf.id))
+  }, [selectedPin, visibleMarkerPins, allInfluencers])
 
   // Initialise map
   useEffect(() => {
@@ -211,24 +231,37 @@ export function MapPage() {
     setSelectedPin(focusPin)
   }, [mapReady, focusPin])
 
-  // Drop markers when pins/visibility change
+  // Drop markers when groups/visibility change — one marker per unique restaurant name
   useEffect(() => {
-    if (!map.current || !markerPins) return
+    if (!map.current) return
     markers.current.forEach((m) => m.remove())
     markers.current = []
     popups.current.forEach((p) => p.remove())
     popups.current = []
 
-    markerPins
-      .filter((pin) => !hiddenIds.has(pin.influencer_id))
-      .forEach((pin) => {
-        const color = colorForId(pin.influencer_id)
-        const influencer = allInfluencers?.find((inf) => inf.id === pin.influencer_id)
+    markerGroups.forEach((group) => {
+      const representativePin = group[0]
+      const count = group.length
+      const isMulti = count > 1
+      const influencer = allInfluencers?.find((inf) => inf.id === representativePin.influencer_id)
 
-        const el = document.createElement('div')
-        el.className = 'flex flex-col items-center cursor-pointer'
+      const el = document.createElement('div')
+      el.className = 'flex flex-col items-center cursor-pointer'
 
-        const avatar = document.createElement('div')
+      const avatar = document.createElement('div')
+      if (isMulti) {
+        // Warm peach dot with count centered — matches the editorial terracotta palette
+        avatar.className =
+          'w-9 h-9 rounded-full border-2 border-white flex items-center justify-center hover:scale-110 transition-transform'
+        avatar.style.backgroundColor = '#99420d'
+        avatar.style.boxShadow = '0 1px 4px rgba(0,0,0,0.35)'
+
+        const countEl = document.createElement('span')
+        countEl.style.cssText = 'font-size:12px;font-weight:700;color:#ffffff;line-height:1;'
+        countEl.textContent = String(count)
+        avatar.appendChild(countEl)
+      } else {
+        const color = colorForId(representativePin.influencer_id)
         avatar.className =
           'w-9 h-9 rounded-full border-2 border-white overflow-hidden flex items-center justify-center hover:scale-110 transition-transform'
         avatar.style.backgroundColor = color
@@ -236,6 +269,7 @@ export function MapPage() {
         if (influencer?.avatar_url) {
           const img = document.createElement('img')
           img.src = influencer.avatar_url
+          img.referrerPolicy = 'no-referrer'
           img.className = 'w-full h-full object-cover'
           avatar.appendChild(img)
         } else {
@@ -244,99 +278,80 @@ export function MapPage() {
           initial.textContent = (influencer?.name ?? '?').charAt(0).toUpperCase()
           avatar.appendChild(initial)
         }
+      }
 
-        const tail = document.createElement('div')
-        tail.style.width = '0'
-        tail.style.height = '0'
-        tail.style.marginTop = '-2px'
-        tail.style.borderLeft = '5px solid transparent'
-        tail.style.borderRight = '5px solid transparent'
-        tail.style.borderTop = `7px solid ${color}`
+      const tailColor = isMulti ? '#99420d' : colorForId(representativePin.influencer_id)
+      const tail = document.createElement('div')
+      tail.style.width = '0'
+      tail.style.height = '0'
+      tail.style.marginTop = '-2px'
+      tail.style.borderLeft = '5px solid transparent'
+      tail.style.borderRight = '5px solid transparent'
+      tail.style.borderTop = `7px solid ${tailColor}`
 
-        el.appendChild(avatar)
-        el.appendChild(tail)
+      el.appendChild(avatar)
+      el.appendChild(tail)
 
-        const tags = [pin.vibe_tag, pin.price_range].filter(Boolean).join(' · ')
+      // Hover popup: no images — restaurant name and (for multi) spotter count
+      const hoverEl = document.createElement('div')
+      hoverEl.className = 'w-48 bg-surface'
+      const hoverBody = document.createElement('div')
+      hoverBody.className = 'p-3 flex flex-col gap-1'
+      const hoverTitle = document.createElement('p')
+      hoverTitle.className = 'font-headline-sm text-headline-sm text-on-surface m-0'
+      hoverTitle.textContent = representativePin.restaurant_name
+      hoverBody.appendChild(hoverTitle)
+      if (isMulti) {
+        const spotterLine = document.createElement('p')
+        spotterLine.className = 'font-label-caps text-label-caps text-secondary uppercase m-0'
+        spotterLine.textContent = `${count} curators recommended this`
+        hoverBody.appendChild(spotterLine)
+      }
+      hoverEl.appendChild(hoverBody)
 
-        // Hover popup: limited info only (photo, name, rating, tags)
-        const hoverEl = document.createElement('div')
-        hoverEl.className = 'w-56 bg-surface'
-        if (pin.photos[0]) {
-          const photoWrap = document.createElement('div')
-          photoWrap.className = 'h-28 w-full border-b border-outline-variant overflow-hidden'
-          const img = document.createElement('img')
-          img.src = pin.photos[0]
-          img.className = 'w-full h-full object-cover'
-          photoWrap.appendChild(img)
-          hoverEl.appendChild(photoWrap)
+      const hoverPopup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        offset: 24,
+        maxWidth: '220px',
+      }).setDOMContent(hoverEl)
+      popups.current.push(hoverPopup)
+
+      let hoverTimeout: ReturnType<typeof setTimeout> | null = null
+      const showPopup = () => {
+        if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
+        if (!hoverPopup.isOpen()) {
+          hoverPopup.setLngLat([representativePin.lng, representativePin.lat]).addTo(map.current!)
         }
-        const hoverBody = document.createElement('div')
-        hoverBody.className = 'p-3 flex flex-col gap-1'
-        const titleRow = document.createElement('div')
-        titleRow.className = 'flex items-start justify-between gap-2'
-        const title = document.createElement('p')
-        title.className = 'font-headline-sm text-headline-sm text-on-surface m-0'
-        title.textContent = pin.restaurant_name
-        titleRow.appendChild(title)
-        if (pin.rating) {
-          const rating = document.createElement('span')
-          rating.className = 'font-label-caps text-label-caps text-primary whitespace-nowrap'
-          rating.textContent = `★ ${pin.rating}`
-          titleRow.appendChild(rating)
+        const popupEl = hoverPopup.getElement()
+        if (popupEl && !popupEl.dataset.listenersAttached) {
+          popupEl.dataset.listenersAttached = 'true'
+          popupEl.addEventListener('mouseenter', showPopup)
+          popupEl.addEventListener('mouseleave', hidePopup)
         }
-        hoverBody.appendChild(titleRow)
-        if (tags) {
-          const tagsEl = document.createElement('p')
-          tagsEl.className = 'font-label-caps text-label-caps text-secondary uppercase m-0'
-          tagsEl.textContent = tags
-          hoverBody.appendChild(tagsEl)
-        }
-        hoverEl.appendChild(hoverBody)
+      }
+      const hidePopup = () => {
+        hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
+      }
 
-        const hoverPopup = new mapboxgl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 24,
-          maxWidth: '240px',
-        }).setDOMContent(hoverEl)
-        popups.current.push(hoverPopup)
-
-        let hoverTimeout: ReturnType<typeof setTimeout> | null = null
-        const showPopup = () => {
-          if (hoverTimeout) { clearTimeout(hoverTimeout); hoverTimeout = null }
-          if (!hoverPopup.isOpen()) {
-            hoverPopup.setLngLat([pin.lng, pin.lat]).addTo(map.current!)
-          }
-          // Attach listeners to the full popup container (tip + content + padding)
-          // once per DOM element so the entire visible area keeps the popup alive.
-          const popupEl = hoverPopup.getElement()
-          if (popupEl && !popupEl.dataset.listenersAttached) {
-            popupEl.dataset.listenersAttached = 'true'
-            popupEl.addEventListener('mouseenter', showPopup)
-            popupEl.addEventListener('mouseleave', hidePopup)
-          }
-        }
-        const hidePopup = () => {
-          hoverTimeout = setTimeout(() => hoverPopup.remove(), 120)
-        }
-
-        el.addEventListener('mouseenter', () => {
-          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
-        })
-        el.addEventListener('mouseleave', () => {
-          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
-        })
-        el.addEventListener('click', () => {
-          hoverPopup.remove()
-          setSelectedPin(pin)
-        })
-
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat([pin.lng, pin.lat])
-          .addTo(map.current!)
-        markers.current.push(marker)
+      el.addEventListener('mouseenter', () => {
+        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) showPopup()
       })
-  }, [markerPins, hiddenIds, allInfluencers])
+      el.addEventListener('mouseleave', () => {
+        if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) hidePopup()
+      })
+      el.addEventListener('click', () => {
+        hoverPopup.remove()
+        setSelectedPin(representativePin)
+        if (isMulti) setSpottersPanelOpen(true)
+      })
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([representativePin.lng, representativePin.lat])
+        .addTo(map.current!)
+      markers.current.push(marker)
+    })
+  }, [markerGroups, allInfluencers])
 
   const tryPlaceLocation = (lat: number, lng: number, name?: string) => {
     if (
@@ -630,17 +645,19 @@ export function MapPage() {
                 </div>
 
                 <div className="flex flex-col flex-grow">
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {selectedPin.vibe_tag && (
-                      <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">
-                        {selectedPin.vibe_tag.toUpperCase()}
-                      </span>
-                    )}
-                    {selectedPin.price_range && (
-                      <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">
-                        {selectedPin.price_range}
-                      </span>
-                    )}
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPin.vibe_tag && (
+                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">
+                          {selectedPin.vibe_tag.toUpperCase()}
+                        </span>
+                      )}
+                      {selectedPin.price_range && (
+                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">
+                          {selectedPin.price_range}
+                        </span>
+                      )}
+                    </div>
                     {(() => {
                       const count = markerPins?.filter(
                         p => p.restaurant_name.toLowerCase() === selectedPin.restaurant_name.toLowerCase()
@@ -648,7 +665,7 @@ export function MapPage() {
                       return (
                         <button
                           onClick={() => setSpottersPanelOpen(true)}
-                          className="border border-primary px-2 py-1 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors"
+                          className="shrink-0 border border-primary px-2 py-1 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors"
                         >
                           {count} {count === 1 ? 'spotter' : 'spotters'} recommended this →
                         </button>
