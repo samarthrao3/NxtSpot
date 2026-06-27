@@ -666,7 +666,7 @@ export function MapPage() {
                       return (
                         <button
                           onClick={() => setSpottersPanelOpen(true)}
-                          className="shrink-0 border border-primary px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors rounded-full"
+                          className="shrink-0 border border-primary px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors rounded-lg"
                         >
                           {count} {count === 1 ? 'spotter' : 'spotters'} recommended this →
                         </button>
