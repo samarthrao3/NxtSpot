@@ -172,6 +172,10 @@ export function MapPage() {
       center: BANGALORE_CENTER,
       zoom: BANGALORE_DEFAULT_ZOOM,
       maxBounds: BANGALORE_MAX_BOUNDS,
+      antialias: false,
+      dragRotate: false,
+      touchPitch: false,
+      fadeDuration: 0,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.current.on('movestart', () => setMapMoving(true))

@@ -101,6 +101,10 @@ export function InfluencerPage() {
       style: MAP_STYLE,
       center: BANGALORE_CENTER,
       zoom: BANGALORE_DEFAULT_ZOOM,
+      antialias: false,
+      dragRotate: false,
+      touchPitch: false,
+      fadeDuration: 0,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     return () => {
