@@ -197,17 +197,48 @@ export function MapPage() {
           const primary = visiblePins[0]
           const isMulti = count > 1
           const color = isMulti ? '#99420d' : colorForId(primary.influencer_id)
-          const size = isMulti ? 18 : 14
-
-          const el = document.createElement('div')
-          el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background-color:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;`
-
+          const pinW = isMulti ? 24 : 20
+          const pinH = isMulti ? 32 : 28
+          const ns = 'http://www.w3.org/2000/svg'
+          const svg = document.createElementNS(ns, 'svg')
+          svg.setAttribute('width', String(pinW))
+          svg.setAttribute('height', String(pinH))
+          svg.setAttribute('viewBox', `0 0 ${pinW} ${pinH}`)
+          svg.style.cssText = 'display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.35));'
+          const pathEl = document.createElementNS(ns, 'path')
+          pathEl.setAttribute('d', isMulti
+            ? 'M12,0 C5.37,0 0,5.37 0,11 C0,19.75 12,32 12,32 C12,32 24,19.75 24,11 C24,5.37 18.63,0 12,0 Z'
+            : 'M10,0 C4.48,0 0,4.48 0,9 C0,16.5 10,28 10,28 C10,28 20,16.5 20,9 C20,4.48 15.52,0 10,0 Z')
+          pathEl.setAttribute('fill', color)
+          pathEl.setAttribute('stroke', 'white')
+          pathEl.setAttribute('stroke-width', '1.5')
+          svg.appendChild(pathEl)
           if (isMulti) {
-            const countEl = document.createElement('span')
-            countEl.style.cssText = 'font-size:9px;font-weight:700;color:#ffffff;line-height:1;pointer-events:none;'
-            countEl.textContent = String(count)
-            el.appendChild(countEl)
+            const t = document.createElementNS(ns, 'text')
+            t.setAttribute('x', '12')
+            t.setAttribute('y', '11')
+            t.setAttribute('text-anchor', 'middle')
+            t.setAttribute('dominant-baseline', 'central')
+            t.setAttribute('font-family', 'system-ui,sans-serif')
+            t.setAttribute('font-size', '9')
+            t.setAttribute('font-weight', '700')
+            t.setAttribute('fill', 'white')
+            t.setAttribute('pointer-events', 'none')
+            t.textContent = String(count)
+            svg.appendChild(t)
+          } else {
+            const dot = document.createElementNS(ns, 'circle')
+            dot.setAttribute('cx', '10')
+            dot.setAttribute('cy', '9')
+            dot.setAttribute('r', '3.5')
+            dot.setAttribute('fill', 'white')
+            dot.setAttribute('fill-opacity', '0.5')
+            dot.setAttribute('pointer-events', 'none')
+            svg.appendChild(dot)
           }
+          const el = document.createElement('div')
+          el.style.cssText = 'cursor:pointer;'
+          el.appendChild(svg)
 
           // Desktop-only hover popup: restaurant name + spotter count, no images
           const hoverEl = document.createElement('div')
@@ -228,7 +259,7 @@ export function MapPage() {
           const hoverPopup = new mapboxgl.Popup({
             closeButton: false,
             closeOnClick: false,
-            offset: 10,
+            offset: [0, -pinH] as [number, number],
             maxWidth: '200px',
           }).setDOMContent(hoverEl)
           popups.current.push(hoverPopup)
@@ -262,7 +293,7 @@ export function MapPage() {
             if (isMulti) setSpottersPanelOpen(true)
           })
 
-          const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
             .setLngLat([group.lng, group.lat])
             .addTo(map.current!)
           markers.current.push(marker)
@@ -271,10 +302,32 @@ export function MapPage() {
       // Influencer's own pins — not in the feed (self-follow is blocked by the backend)
       ownPins?.forEach((pin) => {
         if (hiddenIds.has(pin.influencer_id)) return
+        const ownColor = colorForId(pin.influencer_id)
+        const sns = 'http://www.w3.org/2000/svg'
+        const ownSvg = document.createElementNS(sns, 'svg')
+        ownSvg.setAttribute('width', '20')
+        ownSvg.setAttribute('height', '28')
+        ownSvg.setAttribute('viewBox', '0 0 20 28')
+        ownSvg.style.cssText = 'display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.35));'
+        const ownPath = document.createElementNS(sns, 'path')
+        ownPath.setAttribute('d', 'M10,0 C4.48,0 0,4.48 0,9 C0,16.5 10,28 10,28 C10,28 20,16.5 20,9 C20,4.48 15.52,0 10,0 Z')
+        ownPath.setAttribute('fill', ownColor)
+        ownPath.setAttribute('stroke', 'white')
+        ownPath.setAttribute('stroke-width', '1.5')
+        ownSvg.appendChild(ownPath)
+        const ownDot = document.createElementNS(sns, 'circle')
+        ownDot.setAttribute('cx', '10')
+        ownDot.setAttribute('cy', '9')
+        ownDot.setAttribute('r', '3.5')
+        ownDot.setAttribute('fill', 'white')
+        ownDot.setAttribute('fill-opacity', '0.5')
+        ownDot.setAttribute('pointer-events', 'none')
+        ownSvg.appendChild(ownDot)
         const el = document.createElement('div')
-        el.style.cssText = `width:14px;height:14px;border-radius:50%;background-color:${colorForId(pin.influencer_id)};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;`
+        el.style.cssText = 'cursor:pointer;'
+        el.appendChild(ownSvg)
         el.addEventListener('click', () => setSelectedPin(pin))
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([pin.lng, pin.lat])
           .addTo(map.current!)
         markers.current.push(marker)
