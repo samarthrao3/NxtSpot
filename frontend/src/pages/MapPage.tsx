@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
 import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_MAX_BOUNDS, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
-import { feedApi, influencersApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin } from '@/lib/api'
+import { feedApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { useCurrentUser } from '@/lib/useCurrentUser'
 import { colorForId } from '@/lib/colors'
@@ -139,18 +139,14 @@ export function MapPage() {
     },
   })
 
-  const PAGE_SIZE = 12
-  const {
-    data: influencerPages,
-  } = useInfiniteQuery({
-    queryKey: ['influencers'],
-    queryFn: ({ pageParam }) => influencersApi.getPage(PAGE_SIZE, pageParam),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, _all, lastPageParam) =>
-      lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
+  const { data: followingInfluencers = [] } = useQuery({
+    queryKey: ['following-influencers'],
+    queryFn: async () => {
+      const token = await getAppToken()
+      return subscriptionsApi.getFollowingInfluencers(token)
+    },
   })
 
-  const allInfluencers = influencerPages?.pages.flatMap((p) => p.items) ?? []
   const followingIds = new Set(following?.map((f) => f.influencer_id))
 
   const markerGroups = useMemo(() => {
@@ -170,7 +166,7 @@ export function MapPage() {
     })
   }, [visibleMarkerPins, following])
 
-  const followedInfluencers = allInfluencers.filter((inf) => followingIds.has(inf.id))
+  const followedInfluencers = followingInfluencers
 
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
@@ -185,15 +181,15 @@ export function MapPage() {
   })
 
   const spotterInfluencers = useMemo(() => {
-    if (!selectedPin || !allInfluencers) return []
+    if (!selectedPin) return []
     const normalizedName = selectedPin.restaurant_name.toLowerCase().trim()
     const pinnerIds = new Set(
       visibleMarkerPins
         .filter((p) => p.restaurant_name.toLowerCase().trim() === normalizedName)
         .map((p) => p.influencer_id),
     )
-    return allInfluencers.filter((inf) => pinnerIds.has(inf.id))
-  }, [selectedPin, visibleMarkerPins, allInfluencers])
+    return followingInfluencers.filter((inf) => pinnerIds.has(inf.id))
+  }, [selectedPin, visibleMarkerPins, followingInfluencers])
 
   // Initialise map
   useEffect(() => {
