@@ -34,6 +34,7 @@ export function MapPage() {
   const [pickError, setPickError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
+  const [hasTappedPin, setHasTappedPin] = useState(false)
   const [editingPin, setEditingPin] = useState<Pin | null>(null)
   const [confirmingDeletePin, setConfirmingDeletePin] = useState(false)
   const [spottersPanelOpen, setSpottersPanelOpen] = useState(false)
@@ -54,6 +55,7 @@ export function MapPage() {
     setConfirmingDeletePin(false)
     setSpottersPanelOpen(false)
     setSpottersClosing(false)
+    if (selectedPin) setHasTappedPin(true)
   }, [selectedPin?.id])
 
   const { data: savedPins } = useQuery({
@@ -562,6 +564,14 @@ export function MapPage() {
           {successMessage && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-primary text-primary px-4 py-2 font-body-base text-body-base">
               {successMessage}
+            </div>
+          )}
+
+          {mapReady && !isLoading && !hasTappedPin && !selectedPin && (
+            <div className="md:hidden absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <div className="bg-surface/90 backdrop-blur-sm border border-outline-variant px-4 py-2 rounded-full font-body-sm text-body-sm text-on-surface-variant whitespace-nowrap">
+                Go on, tap a pin. It's been waiting.
+              </div>
             </div>
           )}
 
