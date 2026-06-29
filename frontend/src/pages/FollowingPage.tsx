@@ -264,7 +264,7 @@ function FollowingCard({
             src={influencer.avatar_url}
             alt={influencer.name}
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-300"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-surface-container text-on-surface-variant font-headline-sm text-headline-sm">
