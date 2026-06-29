@@ -30,6 +30,7 @@ export function FollowingPage() {
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
     queryFn: () => pinsApi.getByInfluencer(selectedInfluencer!.id),
     enabled: !!selectedInfluencer,
+    staleTime: 5 * 60 * 1000,
   })
 
   const unfollow = useMutation({
@@ -37,11 +38,22 @@ export function FollowingPage() {
       const token = await getAppToken()
       return subscriptionsApi.unfollow(influencerId, token)
     },
-    onSuccess: (_, influencerId) => {
+    onMutate: async (influencerId) => {
+      await qc.cancelQueries({ queryKey: ['following-influencers'] })
+      const previous = qc.getQueryData<Influencer[]>(['following-influencers'])
+      qc.setQueryData<Influencer[]>(['following-influencers'], (old) =>
+        (old ?? []).filter((inf) => inf.id !== influencerId),
+      )
+      if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['following-influencers'], context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
-      if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
     },
   })
 
@@ -252,7 +264,7 @@ function FollowingCard({
             src={influencer.avatar_url}
             alt={influencer.name}
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-300"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-surface-container text-on-surface-variant font-headline-sm text-headline-sm">

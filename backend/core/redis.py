@@ -15,3 +15,8 @@ async def get_redis() -> aioredis.Redis:
 async def invalidate_feed(user_id: str) -> None:
     r = await get_redis()
     await r.delete(f"feed_pins:{user_id}")
+
+
+async def invalidate_user_caches(user_id: str) -> None:
+    r = await get_redis()
+    await r.delete(f"feed_pins:{user_id}", f"following_influencers:{user_id}")

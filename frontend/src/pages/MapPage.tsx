@@ -34,6 +34,7 @@ export function MapPage() {
   const [pickError, setPickError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null)
+  const [hasTappedPin, setHasTappedPin] = useState(false)
   const [editingPin, setEditingPin] = useState<Pin | null>(null)
   const [confirmingDeletePin, setConfirmingDeletePin] = useState(false)
   const [spottersPanelOpen, setSpottersPanelOpen] = useState(false)
@@ -54,6 +55,7 @@ export function MapPage() {
     setConfirmingDeletePin(false)
     setSpottersPanelOpen(false)
     setSpottersClosing(false)
+    if (selectedPin) setHasTappedPin(true)
   }, [selectedPin?.id])
 
   const { data: savedPins } = useQuery({
@@ -70,14 +72,34 @@ export function MapPage() {
       const token = await getAppToken()
       return savedPinsApi.save(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData<Pin[]>(['saved-pins'])
+      if (selectedPin?.id === pinId) {
+        qc.setQueryData<Pin[]>(['saved-pins'], (old) => [...(old ?? []), selectedPin])
+      }
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
   const unsave = useMutation({
     mutationFn: async (pinId: string) => {
       const token = await getAppToken()
       return savedPinsApi.unsave(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData<Pin[]>(['saved-pins'])
+      qc.setQueryData<Pin[]>(['saved-pins'], (old) => (old ?? []).filter((p) => p.id !== pinId))
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
   const handleSaveToggle = (pinId: string) => {
     if (savedIds.has(pinId)) unsave.mutate(pinId)
@@ -113,15 +135,13 @@ export function MapPage() {
     enabled: currentUser?.role === 'influencer',
   })
 
-  const { data: followingInfluencers = [] } = useQuery({
+  const { data: followedInfluencers = [] } = useQuery({
     queryKey: ['following-influencers'],
     queryFn: async () => {
       const token = await getAppToken()
       return subscriptionsApi.getFollowingInfluencers(token)
     },
   })
-
-  const followedInfluencers = followingInfluencers
 
   const unfollow = useMutation({
     mutationFn: async (influencerId: string) => {
@@ -135,9 +155,6 @@ export function MapPage() {
     },
   })
 
-  // The backend groups pins by restaurant — no frontend string matching needed.
-  // spotterInfluencers finds the group for the selected pin and maps its visible
-  // pins (not toggled off) to followed influencer objects for the spotters panel.
   const spotterInfluencers = useMemo(() => {
     if (!selectedPin || !restaurantGroups) return []
     const key = selectedPin.restaurant_name.toLowerCase().trim()
@@ -145,8 +162,8 @@ export function MapPage() {
     if (!group) return []
     const visiblePins = group.pins.filter((p) => !hiddenIds.has(p.influencer_id))
     const pinnerIds = new Set(visiblePins.map((p) => p.influencer_id))
-    return followingInfluencers.filter((inf) => pinnerIds.has(inf.id))
-  }, [selectedPin, restaurantGroups, hiddenIds, followingInfluencers])
+    return followedInfluencers.filter((inf) => pinnerIds.has(inf.id))
+  }, [selectedPin, restaurantGroups, hiddenIds, followedInfluencers])
 
   // Initialise map
   useEffect(() => {
@@ -157,6 +174,10 @@ export function MapPage() {
       center: BANGALORE_CENTER,
       zoom: BANGALORE_DEFAULT_ZOOM,
       maxBounds: BANGALORE_MAX_BOUNDS,
+      antialias: false,
+      dragRotate: false,
+      touchPitch: false,
+      fadeDuration: 0,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.current.on('movestart', () => setMapMoving(true))
@@ -241,7 +262,6 @@ export function MapPage() {
           el.appendChild(svg)
 
           // Desktop-only hover popup: restaurant name + spotter count, no images
-          const hoverEl = document.createElement('div')
           const hoverBody = document.createElement('div')
           hoverBody.className = 'p-2 flex flex-col gap-1 bg-surface'
           const hoverTitle = document.createElement('p')
@@ -254,14 +274,13 @@ export function MapPage() {
             spotterLine.textContent = `${count} curators recommended this`
             hoverBody.appendChild(spotterLine)
           }
-          hoverEl.appendChild(hoverBody)
 
           const hoverPopup = new mapboxgl.Popup({
             closeButton: false,
             closeOnClick: false,
             offset: [0, -pinH] as [number, number],
             maxWidth: '200px',
-          }).setDOMContent(hoverEl)
+          }).setDOMContent(hoverBody)
           popups.current.push(hoverPopup)
 
           let hoverTimeout: ReturnType<typeof setTimeout> | null = null
@@ -548,6 +567,14 @@ export function MapPage() {
             </div>
           )}
 
+          {mapReady && !isLoading && !hasTappedPin && !selectedPin && (
+            <div className="md:hidden absolute bottom-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <div className="bg-surface/90 backdrop-blur-sm border border-outline-variant px-4 py-2 rounded-full font-body-sm text-body-sm text-on-surface-variant whitespace-nowrap">
+                Go on, tap a pin. It's been waiting.
+              </div>
+            </div>
+          )}
+
           {selectedPin && (
             <aside className="absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-y-auto animate-slide-in-right">
               <div className="sticky top-0 bg-surface z-10 flex justify-between items-center p-4 border-b border-outline-variant">
@@ -649,7 +676,7 @@ export function MapPage() {
                       return (
                         <button
                           onClick={() => setSpottersPanelOpen(true)}
-                          className="shrink-0 border border-primary px-2 py-1 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors"
+                          className="shrink-0 border border-primary px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors rounded-lg"
                         >
                           {count} {count === 1 ? 'spotter' : 'spotters'} recommended this →
                         </button>

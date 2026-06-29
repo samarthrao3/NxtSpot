@@ -27,12 +27,14 @@ export function InfluencerPage() {
     queryKey: ['influencer', handle],
     queryFn: () => influencersApi.getByHandle(handle!),
     enabled: !!handle,
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: pins, isLoading: loadingPins } = useQuery({
     queryKey: ['pins', 'influencer', influencer?.id],
     queryFn: () => pinsApi.getByInfluencer(influencer!.id),
     enabled: !!influencer?.id,
+    staleTime: 5 * 60 * 1000,
   })
 
   const { data: savedPins } = useQuery({
@@ -50,14 +52,33 @@ export function InfluencerPage() {
       const token = await getAppToken()
       return savedPinsApi.save(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData<Pin[]>(['saved-pins'])
+      const pin = pins?.find((p) => p.id === pinId)
+      if (pin) qc.setQueryData<Pin[]>(['saved-pins'], (old) => [...(old ?? []), pin])
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
   const unsave = useMutation({
     mutationFn: async (pinId: string) => {
       const token = await getAppToken()
       return savedPinsApi.unsave(pinId, token)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
+    onMutate: async (pinId) => {
+      await qc.cancelQueries({ queryKey: ['saved-pins'] })
+      const previous = qc.getQueryData<Pin[]>(['saved-pins'])
+      qc.setQueryData<Pin[]>(['saved-pins'], (old) => (old ?? []).filter((p) => p.id !== pinId))
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['saved-pins'], context.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['saved-pins'] }),
   })
 
   const handleSaveToggle = (pinId: string) => {
@@ -80,6 +101,10 @@ export function InfluencerPage() {
       style: MAP_STYLE,
       center: BANGALORE_CENTER,
       zoom: BANGALORE_DEFAULT_ZOOM,
+      antialias: false,
+      dragRotate: false,
+      touchPitch: false,
+      fadeDuration: 0,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     return () => {

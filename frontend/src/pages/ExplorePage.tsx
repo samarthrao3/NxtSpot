@@ -32,6 +32,7 @@ export function ExplorePage() {
     initialPageParam: 0,
     getNextPageParam: (lastPage, _all, lastPageParam) =>
       lastPage.has_more ? lastPageParam + PAGE_SIZE : undefined,
+    staleTime: 5 * 60 * 1000,
   })
 
   const allInfluencers = pages?.pages.flatMap((p) => p.items)
@@ -78,6 +79,7 @@ export function ExplorePage() {
     queryKey: ['pins', 'influencer', selectedInfluencer?.id],
     queryFn: () => pinsApi.getByInfluencer(selectedInfluencer!.id),
     enabled: !!selectedInfluencer,
+    staleTime: 5 * 60 * 1000,
   })
 
   const follow = useMutation({
@@ -85,7 +87,19 @@ export function ExplorePage() {
       const token = await getAppToken()
       return subscriptionsApi.follow(influencerId, token)
     },
-    onSuccess: () => {
+    onMutate: async (influencerId) => {
+      await qc.cancelQueries({ queryKey: ['following'] })
+      const previous = qc.getQueryData<{ influencer_id: string }[]>(['following'])
+      qc.setQueryData<{ influencer_id: string }[]>(['following'], (old) => [
+        ...(old ?? []),
+        { influencer_id: influencerId },
+      ])
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['following'], context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
@@ -96,7 +110,18 @@ export function ExplorePage() {
       const token = await getAppToken()
       return subscriptionsApi.unfollow(influencerId, token)
     },
-    onSuccess: () => {
+    onMutate: async (influencerId) => {
+      await qc.cancelQueries({ queryKey: ['following'] })
+      const previous = qc.getQueryData<{ influencer_id: string }[]>(['following'])
+      qc.setQueryData<{ influencer_id: string }[]>(['following'], (old) =>
+        (old ?? []).filter((f) => f.influencer_id !== influencerId),
+      )
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous !== undefined) qc.setQueryData(['following'], context.previous)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['following'] })
       qc.invalidateQueries({ queryKey: ['following-influencers'] })
       qc.invalidateQueries({ queryKey: ['feed'] })
@@ -365,7 +390,7 @@ function InfluencerCard({
             src={influencer.avatar_url}
             alt={influencer.name}
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-300"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-surface-container text-on-surface-variant font-headline-sm text-headline-sm">

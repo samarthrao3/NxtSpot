@@ -2,14 +2,15 @@ import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.database import get_db
 from models import User, Pin, SavedPin
-from modules.auth.deps import get_current_user
+from modules.auth.deps import get_current_user, get_current_user_id
 from modules.auth.schemas import UserOut
 from modules.pins.schemas import PinOut
 from .schemas import UserUpdateIn
@@ -71,12 +72,12 @@ async def delete_me(
 @router.get("/me/saved", response_model=list[PinOut], summary="All pins the current user has saved")
 async def get_saved_pins(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> list[PinOut]:
     result = await db.execute(
         select(Pin)
         .join(SavedPin, SavedPin.pin_id == Pin.id)
-        .where(SavedPin.user_id == current_user.id)
+        .where(SavedPin.user_id == current_user_id)
     )
     return [PinOut.model_validate(p) for p in result.scalars().all()]
 
@@ -86,36 +87,32 @@ async def save_pin(
     pin_id: uuid.UUID,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> None:
-    existing = await db.execute(
-        select(SavedPin).where(
-            SavedPin.user_id == current_user.id, SavedPin.pin_id == pin_id
+    try:
+        stmt = (
+            pg_insert(SavedPin)
+            .values(user_id=current_user_id, pin_id=pin_id)
+            .on_conflict_do_nothing()
         )
-    )
-    if existing.scalar_one_or_none():
-        response.status_code = 200
-        return
-    pin = await db.get(Pin, pin_id)
-    if pin is None:
+        result = await db.execute(stmt)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
         raise HTTPException(status_code=404, detail="Pin not found")
-    saved = SavedPin(user_id=current_user.id, pin_id=pin_id)
-    db.add(saved)
-    await db.commit()
+    if result.rowcount == 0:
+        response.status_code = 200
 
 
 @router.delete("/me/saved/{pin_id}", status_code=204, summary="Unsave a pin")
 async def unsave_pin(
     pin_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user_id: uuid.UUID = Depends(get_current_user_id),
 ) -> None:
-    result = await db.execute(
-        select(SavedPin).where(
-            SavedPin.user_id == current_user.id, SavedPin.pin_id == pin_id
+    await db.execute(
+        delete(SavedPin).where(
+            SavedPin.user_id == current_user_id, SavedPin.pin_id == pin_id,
         )
     )
-    saved = result.scalar_one_or_none()
-    if saved:
-        await db.delete(saved)
-        await db.commit()
+    await db.commit()
