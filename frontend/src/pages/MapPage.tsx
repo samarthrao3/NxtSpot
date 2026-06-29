@@ -165,6 +165,20 @@ export function MapPage() {
     return followedInfluencers.filter((inf) => pinnerIds.has(inf.id))
   }, [selectedPin, restaurantGroups, hiddenIds, followedInfluencers])
 
+  const spotterGroup = useMemo(() => {
+    if (!selectedPin || !restaurantGroups) return null
+    const key = selectedPin.restaurant_name.toLowerCase().trim()
+    return restaurantGroups.find((g) => g.restaurant_key === key) ?? null
+  }, [selectedPin, restaurantGroups])
+
+  const selectedAvgRating = useMemo(() => {
+    const pins = spotterGroup?.pins ?? (selectedPin ? [selectedPin] : [])
+    const rated = pins.filter((p) => p.rating != null)
+    if (rated.length === 0) return null
+    const avg = rated.reduce((sum, p) => sum + p.rating!, 0) / rated.length
+    return avg % 1 === 0 ? String(avg) : avg.toFixed(1)
+  }, [spotterGroup, selectedPin])
+
   // Initialise map
   useEffect(() => {
     if (map.current || !mapContainer.current) return
@@ -234,28 +248,51 @@ export function MapPage() {
           pathEl.setAttribute('stroke', 'white')
           pathEl.setAttribute('stroke-width', '1.5')
           svg.appendChild(pathEl)
+          const ratedPins = visiblePins.filter((p) => p.rating != null)
+          const avgRating = ratedPins.length > 0
+            ? ratedPins.reduce((sum, p) => sum + p.rating!, 0) / ratedPins.length
+            : null
+          const formatRating = (r: number) => r % 1 === 0 ? String(r) : r.toFixed(1)
+
           if (isMulti) {
-            const t = document.createElementNS(ns, 'text')
-            t.setAttribute('x', '12')
-            t.setAttribute('y', '11')
-            t.setAttribute('text-anchor', 'middle')
-            t.setAttribute('dominant-baseline', 'central')
-            t.setAttribute('font-family', 'system-ui,sans-serif')
-            t.setAttribute('font-size', '9')
-            t.setAttribute('font-weight', '700')
-            t.setAttribute('fill', 'white')
-            t.setAttribute('pointer-events', 'none')
-            t.textContent = String(count)
-            svg.appendChild(t)
+            if (avgRating != null) {
+              const t = document.createElementNS(ns, 'text')
+              t.setAttribute('x', '12')
+              t.setAttribute('y', '11')
+              t.setAttribute('text-anchor', 'middle')
+              t.setAttribute('dominant-baseline', 'central')
+              t.setAttribute('font-family', 'system-ui,sans-serif')
+              t.setAttribute('font-size', '9')
+              t.setAttribute('font-weight', '700')
+              t.setAttribute('fill', 'white')
+              t.setAttribute('pointer-events', 'none')
+              t.textContent = formatRating(avgRating)
+              svg.appendChild(t)
+            }
           } else {
-            const dot = document.createElementNS(ns, 'circle')
-            dot.setAttribute('cx', '10')
-            dot.setAttribute('cy', '9')
-            dot.setAttribute('r', '3.5')
-            dot.setAttribute('fill', 'white')
-            dot.setAttribute('fill-opacity', '0.5')
-            dot.setAttribute('pointer-events', 'none')
-            svg.appendChild(dot)
+            if (primary.rating != null) {
+              const t = document.createElementNS(ns, 'text')
+              t.setAttribute('x', '10')
+              t.setAttribute('y', '9')
+              t.setAttribute('text-anchor', 'middle')
+              t.setAttribute('dominant-baseline', 'central')
+              t.setAttribute('font-family', 'system-ui,sans-serif')
+              t.setAttribute('font-size', '7')
+              t.setAttribute('font-weight', '700')
+              t.setAttribute('fill', 'white')
+              t.setAttribute('pointer-events', 'none')
+              t.textContent = formatRating(primary.rating)
+              svg.appendChild(t)
+            } else {
+              const dot = document.createElementNS(ns, 'circle')
+              dot.setAttribute('cx', '10')
+              dot.setAttribute('cy', '9')
+              dot.setAttribute('r', '3.5')
+              dot.setAttribute('fill', 'white')
+              dot.setAttribute('fill-opacity', '0.5')
+              dot.setAttribute('pointer-events', 'none')
+              svg.appendChild(dot)
+            }
           }
           const el = document.createElement('div')
           el.style.cssText = 'cursor:pointer;'
@@ -646,10 +683,10 @@ export function MapPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : null}
-                  {selectedPin.rating && (
+                  {selectedAvgRating != null && (
                     <div className="absolute bottom-3 right-3 bg-surface border border-outline-variant px-2 py-1 flex items-center gap-1">
                       <Icon name="star" filled className="text-[14px] text-primary" />
-                      <span className="font-label-caps text-label-caps text-on-surface">{selectedPin.rating}</span>
+                      <span className="font-label-caps text-label-caps text-on-surface">{selectedAvgRating}</span>
                     </div>
                   )}
                 </div>
@@ -740,34 +777,36 @@ export function MapPage() {
                     None of the spotters you follow have recommended this place.
                   </p>
                 ) : (
-                  spotterInfluencers.map(inf => (
-                    <div
-                      key={inf.id}
-                      className="flex items-center justify-between px-4 py-3 border-b border-outline-variant"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant shrink-0 bg-surface-container">
-                          {inf.avatar_url ? (
-                            <img src={inf.avatar_url} alt={inf.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="w-full h-full flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant">
-                              {inf.name[0]}
-                            </span>
-                          )}
-                        </div>
-                        <span className="font-body-base text-body-base text-on-surface truncate">
-                          @{inf.handle}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => unfollow.mutate(inf.id)}
-                        disabled={unfollow.isPending && unfollow.variables === inf.id}
-                        className="shrink-0 ml-4 px-3 py-1 border border-outline-variant font-label-caps text-label-caps text-on-surface hover:border-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                  spotterInfluencers.map(inf => {
+                    const rating = spotterGroup?.pins.find((p) => p.influencer_id === inf.id)?.rating
+                    return (
+                      <div
+                        key={inf.id}
+                        className="flex items-center justify-between px-4 py-3 border-b border-outline-variant"
                       >
-                        {unfollow.isPending && unfollow.variables === inf.id ? 'Unfollowing…' : 'Unfollow'}
-                      </button>
-                    </div>
-                  ))
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant shrink-0 bg-surface-container">
+                            {inf.avatar_url ? (
+                              <img src={inf.avatar_url} alt={inf.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="w-full h-full flex items-center justify-center font-label-caps text-label-caps text-on-surface-variant">
+                                {inf.name[0]}
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-body-base text-body-base text-on-surface truncate">
+                            @{inf.handle}
+                          </span>
+                        </div>
+                        {rating != null && (
+                          <div className="shrink-0 ml-4 flex items-center gap-1 border border-outline-variant px-2 py-1">
+                            <Icon name="star" filled className="text-[14px] text-primary" />
+                            <span className="font-label-caps text-label-caps text-on-surface">{rating}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
                 )}
               </div>
             </aside>
