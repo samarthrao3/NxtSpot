@@ -217,7 +217,7 @@ export function MapPage() {
           const count = visiblePins.length
           const primary = visiblePins[0]
           const isMulti = count > 1
-          const color = isMulti ? '#99420d' : colorForId(primary.influencer_id)
+          const color = isMulti ? '#2E5FA3' : colorForId(primary.influencer_id)
           const pinW = isMulti ? 24 : 20
           const pinH = isMulti ? 32 : 28
           const ns = 'http://www.w3.org/2000/svg'
