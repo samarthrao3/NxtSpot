@@ -640,7 +640,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex-1 py-2.5 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors"
+                className="flex-1 py-2.5 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors"
               >
                 Next →
               </button>
@@ -662,7 +662,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                   type="button"
                   onClick={() => submit.mutate()}
                   disabled={!canPublish}
-                  className="flex-1 py-2.5 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submit.isPending ? <><Spinner size={4} /> Publishing…</> : 'Publish'}
                 </button>

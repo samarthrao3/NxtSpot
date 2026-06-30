@@ -158,7 +158,7 @@ export function SettingsPage() {
             <button
               onClick={() => save.mutate()}
               disabled={save.isPending || uploading}
-              className="w-full py-3 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors border border-primary disabled:opacity-50"
+              className="w-full py-3 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors border border-[#1A1A1A] disabled:opacity-50"
             >
               {save.isPending ? 'Saving…' : 'Save Changes'}
             </button>
