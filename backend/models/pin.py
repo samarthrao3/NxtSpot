@@ -27,5 +27,13 @@ class Pin(Base):
     note: Mapped[str | None] = mapped_column(Text)
     rating: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    price_per_head: Mapped[str | None] = mapped_column(String(20))
+    cuisine_tags: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    reasoning: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    must_order_dishes: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    insider_tip: Mapped[str | None] = mapped_column(Text)
+    would_return: Mapped[str | None] = mapped_column(String(20))
+    best_time: Mapped[str | None] = mapped_column(String(40))
+    best_for: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
     influencer: Mapped["User"] = relationship("User", back_populates="pins")  # type: ignore[name-defined]

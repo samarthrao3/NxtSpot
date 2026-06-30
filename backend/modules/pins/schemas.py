@@ -41,6 +41,14 @@ class PinCreate(BaseModel):
     must_order: str | None = Field(default=None, max_length=100)
     note: str | None = Field(default=None, max_length=500)
     rating: float | None = Field(default=None, ge=0.0, le=5.0)
+    price_per_head: str | None = Field(default=None, max_length=20)
+    cuisine_tags: list[str] | None = Field(default=None, max_length=13)
+    reasoning: list[str] | None = Field(default=None, max_length=8)
+    must_order_dishes: list[str] | None = Field(default=None, max_length=3)
+    insider_tip: str | None = Field(default=None, max_length=300)
+    would_return: str | None = Field(default=None, max_length=20)
+    best_time: str | None = Field(default=None, max_length=40)
+    best_for: list[str] | None = Field(default=None, max_length=7)
 
     @field_validator("photos")
     @classmethod
@@ -63,6 +71,14 @@ class PinUpdate(BaseModel):
     must_order: str | None = Field(default=None, max_length=100)
     note: str | None = Field(default=None, max_length=500)
     rating: float | None = Field(default=None, ge=0.0, le=5.0)
+    price_per_head: str | None = Field(default=None, max_length=20)
+    cuisine_tags: list[str] | None = Field(default=None, max_length=13)
+    reasoning: list[str] | None = Field(default=None, max_length=8)
+    must_order_dishes: list[str] | None = Field(default=None, max_length=3)
+    insider_tip: str | None = Field(default=None, max_length=300)
+    would_return: str | None = Field(default=None, max_length=20)
+    best_time: str | None = Field(default=None, max_length=40)
+    best_for: list[str] | None = Field(default=None, max_length=7)
 
     @field_validator("photos")
     @classmethod
@@ -92,3 +108,11 @@ class PinOut(BaseModel):
     note: str | None
     rating: float | None
     created_at: datetime
+    price_per_head: str | None
+    cuisine_tags: list[str] | None
+    reasoning: list[str] | None
+    must_order_dishes: list[str] | None
+    insider_tip: str | None
+    would_return: str | None
+    best_time: str | None
+    best_for: list[str] | None

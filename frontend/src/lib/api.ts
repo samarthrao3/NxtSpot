@@ -42,6 +42,14 @@ export interface Pin {
   note: string | null
   rating: number | null
   created_at: string
+  price_per_head: string | null
+  cuisine_tags: string[] | null
+  reasoning: string[] | null
+  must_order_dishes: string[] | null
+  insider_tip: string | null
+  would_return: string | null
+  best_time: string | null
+  best_for: string[] | null
 }
 
 export interface Influencer {
