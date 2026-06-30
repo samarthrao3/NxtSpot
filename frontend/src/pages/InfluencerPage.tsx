@@ -246,7 +246,7 @@ export function InfluencerPage() {
               </button>
             </div>
 
-            <div className="p-4 flex flex-col flex-1">
+            <div className="p-4 pb-20 md:pb-4 flex flex-col flex-1">
               <div className="w-full aspect-[4/3] border border-outline-variant mb-6 relative overflow-hidden bg-surface-container">
                 {selectedPin.photos[0] ? (
                   <img

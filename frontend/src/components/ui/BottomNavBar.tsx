@@ -16,10 +16,10 @@ export function BottomNavBar() {
 
   if (!session) {
     return (
-      <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 bg-surface border-t border-outline-variant h-14 px-4 flex items-center">
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 rounded-full bg-surface-container shadow-[0_4px_24px_rgba(0,0,0,0.6)] h-14 px-5 flex items-center">
         <button
           onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/explore` } })}
-          className="w-full h-9 bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-wider hover:opacity-90 transition-opacity"
+          className="w-full h-9 rounded-full bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-wider hover:opacity-90 transition-opacity"
         >
           Sign In
         </button>
@@ -28,19 +28,24 @@ export function BottomNavBar() {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 w-full z-50 bg-surface border-t border-outline-variant flex justify-around items-center h-16 px-2">
+    <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 rounded-full bg-surface-container shadow-[0_4px_24px_rgba(0,0,0,0.6)] flex justify-around items-center h-14 px-3">
       {items.map(({ to, icon, label }) => {
         const active = pathname === to
         return (
           <Link
             key={to}
             to={to}
-            className={`flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${
-              active ? 'text-primary border-t-2 border-primary -mt-[2px]' : 'text-secondary hover:text-on-surface'
-            }`}
+            className="flex flex-col items-center justify-center flex-1 h-full transition-colors"
           >
-            <Icon name={icon} className="text-[22px]" filled={active} />
-            <span className="font-label-caps text-[10px] leading-none uppercase tracking-wide">{label}</span>
+            <Icon
+              name={icon}
+              filled={active}
+              className={`text-[22px] transition-colors ${active ? 'text-primary' : 'text-secondary'}`}
+            />
+            <span className={`font-label-caps text-[9px] leading-none uppercase tracking-wide mt-0.5 transition-colors ${active ? 'text-primary' : 'text-secondary'}`}>
+              {label}
+            </span>
+            {active && <span className="mt-1 h-0.5 w-4 rounded-full bg-primary" />}
           </Link>
         )
       })}

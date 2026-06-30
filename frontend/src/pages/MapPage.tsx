@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
@@ -618,14 +618,20 @@ export function MapPage() {
           )}
 
           {isLoading && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 flex items-center gap-2 font-body-base text-body-base text-secondary shadow-lg">
+            <div className="absolute top-20 md:top-4 left-1/2 -translate-x-1/2 z-10 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 flex items-center gap-2 font-body-base text-body-base text-secondary shadow-lg whitespace-nowrap">
               <Spinner size={4} />
               Loading pins…
             </div>
           )}
           {!isLoading && (restaurantGroups?.length ?? 0) === 0 && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 font-body-base text-body-base text-secondary shadow-lg whitespace-nowrap">
-              Follow some curators on Discover to see their pins here
+            <div className="absolute bottom-36 md:bottom-auto md:top-4 left-1/2 -translate-x-1/2 z-30 rounded-2xl bg-surface-container-low/90 backdrop-blur-sm px-5 py-3 shadow-lg max-w-[calc(100%-2rem)] text-center">
+              <p className="font-body-sm text-body-sm text-secondary leading-relaxed">
+                Follow curators on{' '}
+                <Link to="/explore" className="text-primary hover:underline">
+                  Discover
+                </Link>{' '}
+                to see their pins here
+              </p>
             </div>
           )}
 
@@ -646,7 +652,7 @@ export function MapPage() {
             </div>
           )}
           {successMessage && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 text-primary font-body-base text-body-base shadow-lg">
+            <div className="absolute top-20 md:top-4 left-1/2 -translate-x-1/2 z-20 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 text-primary font-body-base text-body-base shadow-lg whitespace-nowrap">
               {successMessage}
             </div>
           )}
@@ -863,7 +869,7 @@ export function MapPage() {
               </div>
 
               {/* Content */}
-              <div className="flex flex-col flex-1 px-5 pb-16 md:pb-6">
+              <div className="flex flex-col flex-1 px-5 pb-24 md:pb-6">
                 <div className="flex items-center justify-between gap-2 mb-3 pt-2">
                   <div className="flex flex-wrap gap-1.5">
                     {selectedPin.vibe_tag && (

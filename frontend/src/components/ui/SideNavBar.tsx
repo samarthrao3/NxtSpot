@@ -28,7 +28,7 @@ export function SideNavBar({ children, onAddPin, pinOpen }: Props) {
       )}
 
       <aside
-        className={`flex fixed left-0 top-12 h-[calc(100vh-48px-56px)] md:h-[calc(100vh-48px)] w-[280px] max-w-[85vw] bg-surface border-r border-outline-variant flex-col pt-16 pb-4 z-40 transition-transform duration-300 ease-in-out ${
+        className={`flex fixed left-0 top-12 h-[calc(100vh-48px-72px)] md:h-[calc(100vh-48px)] w-[280px] max-w-[85vw] bg-surface border-r border-outline-variant flex-col pt-16 pb-4 z-40 transition-transform duration-300 ease-in-out ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
