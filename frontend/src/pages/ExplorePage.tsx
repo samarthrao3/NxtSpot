@@ -382,10 +382,10 @@ export function ExplorePage() {
         )}
       </main>
 
-      <BottomNavBar />
+      <BottomNavBar hidden={!!selectedInfluencer} />
 
       {selectedInfluencer && (
-        <aside className="fixed top-12 right-0 bottom-14 md:bottom-0 w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-hidden animate-slide-in-right">
+        <aside className="fixed top-12 right-0 bottom-0 w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-hidden animate-slide-in-right">
           <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant shrink-0">
             <button
               onClick={() => setSelectedInfluencer(null)}

@@ -28,6 +28,7 @@ export function MapPage() {
   const popups = useRef<mapboxgl.Popup[]>([])
   const [mapReady, setMapReady] = useState(false)
   const [mapMoving, setMapMoving] = useState(false)
+  const [sideNavOpen, setSideNavOpen] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [addPinMode, setAddPinMode] = useState(false)
   const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number; name?: string } | null>(null)
@@ -499,11 +500,12 @@ export function MapPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
       <TopNavBar />
       <div className="flex flex-1 mt-12 relative">
         <SideNavBar
           pinOpen={mapMoving || detailPanelOpen}
+          onOpenChange={setSideNavOpen}
           onAddPin={
             currentUser?.role === 'influencer'
               ? () => {
@@ -1060,7 +1062,7 @@ export function MapPage() {
           )}
         </main>
       </div>
-      <BottomNavBar />
+      <BottomNavBar hidden={sideNavOpen || detailPanelOpen} />
 
       {pendingLocation && (
         <PinFormModal

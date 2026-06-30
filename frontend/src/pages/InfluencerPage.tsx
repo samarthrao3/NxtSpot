@@ -173,7 +173,7 @@ export function InfluencerPage() {
 
   if (loadingProfile) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background">
+      <div className="flex items-center justify-center h-[100dvh] bg-background">
         <Spinner />
       </div>
     )
@@ -181,7 +181,7 @@ export function InfluencerPage() {
 
   if (!influencer) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-background gap-3">
+      <div className="flex flex-col items-center justify-center h-[100dvh] bg-background gap-3">
         <p className="font-body-base text-body-base text-secondary">Influencer not found</p>
         <a href="/explore" className="text-primary hover:underline font-body-base text-body-base">
           ← Back to explore
@@ -191,7 +191,7 @@ export function InfluencerPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
+    <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-background">
       <TopNavBar />
       <main className="flex-grow relative w-full mt-12">
         <div ref={mapContainer} className="absolute inset-0" />
