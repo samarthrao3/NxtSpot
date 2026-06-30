@@ -187,8 +187,8 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
   const canPublish = !isUploading && !submit.isPending
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 p-0 md:p-4">
-      <div className="bg-surface rounded-t-2xl md:rounded-2xl overflow-hidden w-full md:max-w-md max-h-[92vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="bg-surface rounded-2xl overflow-hidden w-full max-w-md max-h-[88vh] flex flex-col shadow-2xl">
 
         {/* Header */}
         <div className="flex justify-between items-center px-5 pt-5 pb-3 shrink-0">
