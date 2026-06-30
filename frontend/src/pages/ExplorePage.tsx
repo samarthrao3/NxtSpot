@@ -175,7 +175,7 @@ export function ExplorePage() {
 
       <main className="flex-1 mt-12 pb-24 md:pb-16">
         {/* Full-bleed hero — no hard border, content breathes into the page */}
-        <div className="px-margin-mobile md:px-margin-desktop py-16 md:py-24">
+        <div className="px-margin-mobile md:px-margin-desktop py-10 md:py-24">
           <div className="max-w-container-max mx-auto">
             <p className="font-label-caps text-label-caps text-primary tracking-[0.2em] uppercase mb-4">
               {session ? "Bangalore's Most Trusted Voices" : "Bangalore's Food Inner Circle"}
@@ -210,20 +210,24 @@ export function ExplorePage() {
           ) : session ? (
             <>
               {/* Search + category filters */}
-              <div className="mb-10">
+              <div className="mb-6 md:mb-10">
                 <input
                   type="text"
                   placeholder="Search by name or handle…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full max-w-md rounded-xl bg-surface-container-low px-4 py-2.5 font-body-base text-body-base text-on-surface placeholder:text-secondary focus:outline-none focus:bg-surface-container transition-colors mb-5"
+                  className="w-full max-w-md rounded-xl bg-surface-container-low px-4 py-2.5 font-body-base text-body-base text-on-surface placeholder:text-secondary focus:outline-none focus:bg-surface-container transition-colors mb-4"
                 />
-                <div className="flex flex-wrap gap-2">
+                {/* Horizontal scroll on mobile, wrap on desktop */}
+                <div
+                  className="flex gap-2 overflow-x-auto md:flex-wrap md:overflow-x-visible pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden"
+                  style={{ scrollbarWidth: 'none' }}
+                >
                   {CATEGORIES.map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setActiveCategory(cat)}
-                      className={`rounded-full px-5 py-2 font-label-caps text-label-caps tracking-wider uppercase transition-colors ${
+                      className={`shrink-0 rounded-full px-4 py-1.5 md:px-5 md:py-2 font-label-caps text-label-caps tracking-wider uppercase transition-colors ${
                         activeCategory === cat
                           ? 'bg-primary text-on-primary'
                           : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
