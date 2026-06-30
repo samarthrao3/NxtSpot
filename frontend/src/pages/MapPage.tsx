@@ -39,6 +39,8 @@ export function MapPage() {
   const [confirmingDeletePin, setConfirmingDeletePin] = useState(false)
   const [spottersPanelOpen, setSpottersPanelOpen] = useState(false)
   const [spottersClosing, setSpottersClosing] = useState(false)
+  const [pinPixelPos, setPinPixelPos] = useState<{ x: number; y: number } | null>(null)
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false)
 
   const closeSpottersPanel = () => {
     setSpottersClosing(true)
@@ -55,8 +57,33 @@ export function MapPage() {
     setConfirmingDeletePin(false)
     setSpottersPanelOpen(false)
     setSpottersClosing(false)
+    setDetailPanelOpen(false)
     if (selectedPin) setHasTappedPin(true)
   }, [selectedPin?.id])
+
+  useEffect(() => {
+    if (!selectedPin || !mapReady) { setPinPixelPos(null); return }
+    const update = () => {
+      if (!map.current) return
+      const { x, y } = map.current.project([selectedPin.lng, selectedPin.lat])
+      setPinPixelPos({ x, y })
+    }
+    update()
+    map.current?.on('move', update)
+    return () => { map.current?.off('move', update) }
+  }, [selectedPin, mapReady])
+
+  useEffect(() => {
+    if (!detailPanelOpen) return
+    window.history.pushState({ detailPanel: true }, '')
+    const handlePop = () => setDetailPanelOpen(false)
+    window.addEventListener('popstate', handlePop)
+    return () => {
+      window.removeEventListener('popstate', handlePop)
+      // Panel closed by in-app button — consume the pushed entry
+      if (window.history.state?.detailPanel) window.history.back()
+    }
+  }, [detailPanelOpen])
 
   const { data: savedPins } = useQuery({
     queryKey: ['saved-pins'],
@@ -140,18 +167,6 @@ export function MapPage() {
     queryFn: async () => {
       const token = await getAppToken()
       return subscriptionsApi.getFollowingInfluencers(token)
-    },
-  })
-
-  const unfollow = useMutation({
-    mutationFn: async (influencerId: string) => {
-      const token = await getAppToken()
-      return subscriptionsApi.unfollow(influencerId, token)
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['following'] })
-      qc.invalidateQueries({ queryKey: ['following-influencers'] })
-      qc.invalidateQueries({ queryKey: ['feed'] })
     },
   })
 
@@ -449,7 +464,7 @@ export function MapPage() {
       <TopNavBar />
       <div className="flex flex-1 mt-12 relative">
         <SideNavBar
-          pinOpen={!!selectedPin || mapMoving}
+          pinOpen={mapMoving || detailPanelOpen}
           onAddPin={
             currentUser?.role === 'influencer'
               ? () => {
@@ -612,76 +627,180 @@ export function MapPage() {
             </div>
           )}
 
-          {selectedPin && (
+          {selectedPin && pinPixelPos && !detailPanelOpen && (
+            <div
+              className="absolute z-40 w-[280px] bg-surface border border-outline-variant shadow-xl"
+              style={{ left: pinPixelPos.x, top: pinPixelPos.y, transform: 'translate(-50%, calc(-100% - 36px))' }}
+            >
+              {/* Down-pointing caret */}
+              <div className="absolute -bottom-[7px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-surface border-r border-b border-outline-variant rotate-45" />
+
+              {/* Cover photo */}
+              {selectedPin.photos[0] && (
+                <div className="relative w-full overflow-hidden" style={{ height: 120 }}>
+                  <img src={selectedPin.photos[0]} alt={selectedPin.restaurant_name} className="w-full h-full object-cover" />
+                  {selectedAvgRating != null && (
+                    <div className="absolute bottom-2 left-2 bg-surface/90 px-1.5 py-0.5 flex items-center gap-1">
+                      <Icon name="star" filled className="text-[12px] text-primary" />
+                      <span className="font-label-caps text-label-caps text-on-surface">{selectedAvgRating}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Header row */}
+              <div className="flex items-center justify-between px-3 pt-2.5 pb-1 gap-2">
+                <h3 className="font-headline-sm text-headline-sm text-on-surface leading-tight flex-1 min-w-0 truncate">
+                  {selectedPin.restaurant_name}
+                </h3>
+                <div className="flex items-center gap-1 shrink-0">
+                  {isOwnPin ? (
+                    <>
+                      <button onClick={() => setEditingPin(selectedPin)} className="text-on-surface-variant hover:text-primary transition-colors p-0.5">
+                        <Icon name="edit" className="text-[18px]" />
+                      </button>
+                      <button onClick={() => setConfirmingDeletePin(true)} className="text-on-surface-variant hover:text-red-600 transition-colors p-0.5">
+                        <Icon name="delete" className="text-[18px]" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleSaveToggle(selectedPin.id)}
+                      className={`transition-colors p-0.5 ${savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                    >
+                      <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} className="text-[18px]" />
+                    </button>
+                  )}
+                  <button onClick={() => setSelectedPin(null)} className="text-on-surface-variant hover:text-on-surface transition-colors p-0.5 ml-0.5">
+                    <Icon name="close" className="text-[18px]" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Meta row */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-2">
+                {(selectedPin.price_range || selectedPin.price_per_head) && (
+                  <span className="font-label-caps text-label-caps text-on-surface-variant">
+                    {selectedPin.price_per_head ?? selectedPin.price_range}
+                  </span>
+                )}
+                {selectedPin.vibe_tag && (
+                  <span className="font-label-caps text-label-caps text-on-surface-variant">· {selectedPin.vibe_tag}</span>
+                )}
+                {selectedAvgRating != null && !selectedPin.photos[0] && (
+                  <span className="flex items-center gap-0.5 font-label-caps text-label-caps text-on-surface-variant">
+                    · <Icon name="star" filled className="text-[11px] text-primary" /> {selectedAvgRating}
+                  </span>
+                )}
+                {selectedPin.would_return && (
+                  <span className="font-label-caps text-label-caps text-secondary">· Returns: {selectedPin.would_return}</span>
+                )}
+              </div>
+
+              {/* Cuisine tags */}
+              {selectedPin.cuisine_tags && selectedPin.cuisine_tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 px-3 pb-2">
+                  {selectedPin.cuisine_tags.map((tag) => (
+                    <span key={tag} className="px-1.5 py-0.5 border border-outline-variant bg-surface-container-low font-label-caps text-[9px] text-on-surface-variant">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Find out more */}
+              <div className="border-t border-outline-variant mx-3 pt-2 pb-2">
+                <button
+                  onClick={() => setDetailPanelOpen(true)}
+                  className="w-full py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary border border-primary transition-colors"
+                >
+                  Find out more →
+                </button>
+              </div>
+
+              {/* Delete confirmation */}
+              {confirmingDeletePin && (
+                <div className="border-t border-outline-variant mx-3 pt-2 pb-2 flex items-center justify-between">
+                  <span className="font-body-sm text-body-sm text-on-surface">Delete this pin?</span>
+                  <div className="flex items-center gap-2">
+                    {deletePin.isError && <span className="font-body-sm text-body-sm text-red-600">Failed.</span>}
+                    <button onClick={() => setConfirmingDeletePin(false)} className="font-label-caps text-label-caps text-secondary hover:text-on-surface uppercase">Cancel</button>
+                    <button
+                      onClick={() => deletePin.mutate(selectedPin.id)}
+                      disabled={deletePin.isPending}
+                      className="font-label-caps text-label-caps text-red-600 hover:text-red-700 uppercase disabled:opacity-50"
+                    >
+                      {deletePin.isPending ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer actions */}
+              <div className="border-t border-outline-variant flex">
+                {(() => {
+                  const group = restaurantGroups?.find((g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim())
+                  const count = group?.pins.filter((p) => !hiddenIds.has(p.influencer_id)).length ?? 1
+                  return (
+                    <button
+                      onClick={() => setSpottersPanelOpen(true)}
+                      className="flex-1 py-2 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors border-r border-outline-variant text-center"
+                    >
+                      {count} {count === 1 ? 'spotter' : 'spotters'} →
+                    </button>
+                  )
+                })()}
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 py-2 font-label-caps text-label-caps text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1"
+                >
+                  <Icon name="directions" className="text-[14px]" />
+                  Directions
+                </a>
+              </div>
+            </div>
+          )}
+
+          {detailPanelOpen && selectedPin && (
             <aside className="absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-y-auto animate-slide-in-right">
               <div className="sticky top-0 bg-surface z-10 flex justify-between items-center p-4 border-b border-outline-variant">
+                <button onClick={() => setSelectedPin(null)} className="text-on-surface-variant hover:text-on-surface transition-colors">
+                  <Icon name="arrow_back" />
+                </button>
                 {confirmingDeletePin ? (
-                  <>
-                    <span className="font-body-sm text-body-sm text-on-surface">Delete this pin?</span>
-                    <div className="flex items-center gap-2">
-                      {deletePin.isError && (
-                        <span className="font-body-sm text-body-sm text-red-600">Failed.</span>
-                      )}
-                      <button
-                        onClick={() => setConfirmingDeletePin(false)}
-                        className="font-label-caps text-label-caps text-secondary hover:text-on-surface uppercase transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => deletePin.mutate(selectedPin.id)}
-                        disabled={deletePin.isPending}
-                        className="px-3 py-1 bg-red-600 text-white font-label-caps text-label-caps uppercase hover:bg-red-700 transition-colors disabled:opacity-50"
-                      >
-                        {deletePin.isPending ? 'Deleting…' : 'Delete'}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
+                  <div className="flex items-center gap-2">
+                    {deletePin.isError && <span className="font-body-sm text-body-sm text-red-600">Failed.</span>}
+                    <button onClick={() => setConfirmingDeletePin(false)} className="font-label-caps text-label-caps text-secondary hover:text-on-surface uppercase transition-colors">Cancel</button>
                     <button
-                      onClick={() => setSelectedPin(null)}
-                      className="text-on-surface-variant hover:text-on-surface transition-colors"
+                      onClick={() => deletePin.mutate(selectedPin.id)}
+                      disabled={deletePin.isPending}
+                      className="px-3 py-1 bg-red-600 text-white font-label-caps text-label-caps uppercase hover:bg-red-700 transition-colors disabled:opacity-50"
                     >
-                      <Icon name="close" />
+                      {deletePin.isPending ? 'Deleting…' : 'Delete'}
                     </button>
-                    {isOwnPin ? (
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setConfirmingDeletePin(true)}
-                          className="text-on-surface-variant hover:text-red-600 transition-colors"
-                        >
-                          <Icon name="delete" />
-                        </button>
-                        <button
-                          onClick={() => setEditingPin(selectedPin)}
-                          className="text-on-surface-variant hover:text-primary transition-colors"
-                        >
-                          <Icon name="edit" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleSaveToggle(selectedPin.id)}
-                        className={`transition-colors ${
-                          savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'
-                        }`}
-                      >
-                        <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
-                      </button>
-                    )}
-                  </>
+                  </div>
+                ) : isOwnPin ? (
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setConfirmingDeletePin(true)} className="text-on-surface-variant hover:text-red-600 transition-colors"><Icon name="delete" /></button>
+                    <button onClick={() => setEditingPin(selectedPin)} className="text-on-surface-variant hover:text-primary transition-colors"><Icon name="edit" /></button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleSaveToggle(selectedPin.id)}
+                    className={`transition-colors ${savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                  >
+                    <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
+                  </button>
                 )}
               </div>
 
               <div className="p-4 flex flex-col flex-1">
+                {/* Photo */}
                 <div className="w-full aspect-[4/3] border border-outline-variant mb-6 relative overflow-hidden bg-surface-container">
                   {selectedPin.photos[0] ? (
-                    <img
-                      src={selectedPin.photos[0]}
-                      alt={selectedPin.restaurant_name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={selectedPin.photos[0]} alt={selectedPin.restaurant_name} className="w-full h-full object-cover" />
                   ) : null}
                   {selectedAvgRating != null && (
                     <div className="absolute bottom-3 right-3 bg-surface border border-outline-variant px-2 py-1 flex items-center gap-1">
@@ -692,56 +811,106 @@ export function MapPage() {
                 </div>
 
                 <div className="flex flex-col flex-grow">
+                  {/* Top row: tags + spotters */}
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="flex flex-wrap gap-2">
                       {selectedPin.vibe_tag && (
-                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">
-                          {selectedPin.vibe_tag.toUpperCase()}
-                        </span>
+                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">{selectedPin.vibe_tag.toUpperCase()}</span>
                       )}
-                      {selectedPin.price_range && (
-                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">
-                          {selectedPin.price_range}
-                        </span>
+                      {(selectedPin.price_per_head || selectedPin.price_range) && (
+                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">{selectedPin.price_per_head ?? selectedPin.price_range}</span>
                       )}
                     </div>
                     {(() => {
-                      const group = restaurantGroups?.find(
-                        (g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim()
-                      )
+                      const group = restaurantGroups?.find((g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim())
                       const count = group?.pins.filter((p) => !hiddenIds.has(p.influencer_id)).length ?? 1
                       return (
-                        <button
-                          onClick={() => setSpottersPanelOpen(true)}
-                          className="shrink-0 border border-primary px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors rounded-lg"
-                        >
+                        <button onClick={() => setSpottersPanelOpen(true)} className="shrink-0 border border-primary px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors rounded-lg">
                           {count} {count === 1 ? 'spotter' : 'spotters'} recommended this →
                         </button>
                       )
                     })()}
                   </div>
-                  <h2 className="font-headline-md text-headline-md text-on-surface mt-2 mb-1">
-                    {selectedPin.restaurant_name}
-                  </h2>
 
-                  {selectedPin.must_order && (
-                    <div className="border-t border-outline-variant pt-6 mb-6 mt-4">
-                      <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-2">MUST ORDER</h3>
-                      <p className="font-headline-sm text-headline-sm text-primary mb-2">{selectedPin.must_order}</p>
-                      {selectedPin.note && (
-                        <p className="font-body-base text-body-base text-on-surface leading-relaxed">
-                          "{selectedPin.note}"
-                        </p>
+                  {/* Name */}
+                  <h2 className="font-headline-md text-headline-md text-on-surface mt-2 mb-1">{selectedPin.restaurant_name}</h2>
+
+                  {/* Cuisine tags */}
+                  {selectedPin.cuisine_tags && selectedPin.cuisine_tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {selectedPin.cuisine_tags.map((tag) => (
+                        <span key={tag} className="px-2 py-0.5 bg-surface-container font-label-caps text-label-caps text-on-surface-variant border border-outline-variant">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Would return / best time / best for */}
+                  {(selectedPin.would_return || selectedPin.best_time || selectedPin.best_for?.length) && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {selectedPin.would_return && (
+                        <span className="font-label-caps text-label-caps text-secondary">Would return: <span className="text-on-surface">{selectedPin.would_return}</span></span>
+                      )}
+                      {selectedPin.best_time && (
+                        <span className="font-label-caps text-label-caps text-secondary">· Best time: <span className="text-on-surface">{selectedPin.best_time.split(' (')[0]}</span></span>
+                      )}
+                      {selectedPin.best_for && selectedPin.best_for.length > 0 && (
+                        <span className="font-label-caps text-label-caps text-secondary w-full">Best for: <span className="text-on-surface">{selectedPin.best_for.join(', ')}</span></span>
                       )}
                     </div>
                   )}
-                  {!selectedPin.must_order && selectedPin.note && (
-                    <p className="font-body-base text-body-base text-on-surface leading-relaxed mt-4 border-t border-outline-variant pt-6">
-                      "{selectedPin.note}"
-                    </p>
+
+                  {/* Reasoning */}
+                  {selectedPin.reasoning && selectedPin.reasoning.length > 0 && (
+                    <div className="flex flex-col gap-1 mb-4 border-t border-outline-variant pt-4 mt-1">
+                      {selectedPin.reasoning.map((r) => (
+                        <div key={r} className="flex items-center gap-2">
+                          <Icon name="star" filled className="text-[13px] text-primary shrink-0" />
+                          <span className="font-body-sm text-body-sm text-on-surface">{r}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
 
-                  <div className="mt-auto pt-6 pb-16 md:pb-0 border-t border-outline-variant">
+                  {/* Must-order dishes */}
+                  {(() => {
+                    const dishes = selectedPin.must_order_dishes?.filter(Boolean)
+                    const legacy = selectedPin.must_order
+                    if (dishes && dishes.length > 0) return (
+                      <div className="border-t border-outline-variant pt-4 mb-4 mt-1">
+                        <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-2">MUST ORDER</h3>
+                        <ol className="flex flex-col gap-1">
+                          {dishes.map((d, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                              <span className="font-label-caps text-label-caps text-primary">{i + 1}.</span>
+                              <span className="font-headline-sm text-headline-sm text-on-surface">{d}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )
+                    if (legacy) return (
+                      <div className="border-t border-outline-variant pt-4 mb-4 mt-1">
+                        <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-2">MUST ORDER</h3>
+                        <p className="font-headline-sm text-headline-sm text-primary">{legacy}</p>
+                      </div>
+                    )
+                    return null
+                  })()}
+
+                  {/* Note */}
+                  {selectedPin.note && (
+                    <p className="font-body-base text-body-base text-on-surface leading-relaxed border-t border-outline-variant pt-4 mt-1 mb-3">"{selectedPin.note}"</p>
+                  )}
+
+                  {/* Insider tip */}
+                  {selectedPin.insider_tip && (
+                    <div className="bg-surface-container-low border border-outline-variant px-3 py-3 mb-4">
+                      <p className="font-label-caps text-label-caps text-secondary mb-1">INSIDER TIP</p>
+                      <p className="font-body-sm text-body-sm text-on-surface italic leading-relaxed">{selectedPin.insider_tip}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-auto pt-4 pb-16 md:pb-0 border-t border-outline-variant">
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
                       target="_blank"
