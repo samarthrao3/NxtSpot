@@ -265,7 +265,7 @@ export function InfluencerPage() {
                     href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors border border-[#1A1A1A] flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors border border-primary flex items-center justify-center gap-2"
                   >
                     <Icon name="directions" className="text-[18px]" />
                     GET DIRECTIONS
