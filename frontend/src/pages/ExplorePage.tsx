@@ -241,15 +241,14 @@ export function ExplorePage() {
                 </p>
               ) : (
                 <>
-                  {/* Featured spotter — magazine split, rounded, no border */}
+                  {/* Featured spotter — stacks on mobile, magazine split on desktop */}
                   {featuredInfluencer && (
                     <article
-                      className="w-full rounded-2xl mb-10 group cursor-pointer flex overflow-hidden bg-surface-container-lowest"
-                      style={{ minHeight: 380 }}
+                      className="w-full rounded-2xl mb-10 group cursor-pointer flex flex-col md:flex-row overflow-hidden bg-surface-container-lowest"
                       onClick={() => setSelectedInfluencer(featuredInfluencer)}
                     >
-                      {/* Left: portrait photo */}
-                      <div className="relative w-1/2 shrink-0 overflow-hidden">
+                      {/* Photo — full-width on mobile, half-width on desktop */}
+                      <div className="relative w-full md:w-1/2 shrink-0 overflow-hidden" style={{ minHeight: 220 }}>
                         {featuredInfluencer.avatar_url ? (
                           <img
                             src={featuredInfluencer.avatar_url}
@@ -266,22 +265,22 @@ export function ExplorePage() {
                         )}
                       </div>
 
-                      {/* Right: dark editorial panel */}
-                      <div className="flex-1 flex flex-col justify-between p-6 md:p-10">
+                      {/* Editorial panel */}
+                      <div className="flex-1 flex flex-col justify-between p-6 md:p-10" style={{ minHeight: 200 }}>
                         <span className="font-label-caps text-label-caps text-primary tracking-[0.2em] uppercase self-start text-[10px]">
                           ★ Featured Spotter
                         </span>
                         <div>
-                          <h2 className="font-display-lg text-display-lg text-on-surface italic leading-tight mb-4">
+                          <h2 className="font-display-lg text-on-surface italic leading-tight mb-4" style={{ fontSize: 'clamp(24px, 5vw, 48px)' }}>
                             {featuredInfluencer.name}
                           </h2>
                           <p className="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1">
                             @{featuredInfluencer.handle}
                           </p>
-                          <p className="font-label-caps text-label-caps text-secondary mb-8">
+                          <p className="font-label-caps text-label-caps text-secondary mb-6">
                             {featuredInfluencer.pin_count} spots · {featuredInfluencer.follower_count} followers
                           </p>
-                          <div className="flex gap-3 flex-wrap">
+                          <div className="flex flex-wrap gap-3">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
