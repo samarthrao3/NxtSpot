@@ -10,13 +10,13 @@ const items = [
   { to: '/saved', icon: 'bookmark', label: 'Saved' },
 ]
 
-export function BottomNavBar() {
+export function BottomNavBar({ hidden = false }: { hidden?: boolean }) {
   const { pathname } = useLocation()
   const session = useSession()
 
   if (!session) {
     return (
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 rounded-full bg-surface-container shadow-[0_4px_24px_rgba(0,0,0,0.6)] h-14 px-5 flex items-center">
+      <nav className={`md:hidden fixed bottom-4 left-4 right-4 z-50 rounded-full bg-surface-container shadow-[0_4px_24px_rgba(0,0,0,0.6)] h-14 px-5 flex items-center transition-transform duration-300 ease-in-out ${hidden ? 'translate-y-[calc(100%+1rem)]' : 'translate-y-0'}`}>
         <button
           onClick={() => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/explore` } })}
           className="w-full h-9 rounded-full bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-wider hover:opacity-90 transition-opacity"
@@ -28,7 +28,7 @@ export function BottomNavBar() {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 rounded-full bg-surface-container shadow-[0_4px_24px_rgba(0,0,0,0.6)] flex justify-around items-center h-14 px-3">
+    <nav className={`md:hidden fixed bottom-4 left-4 right-4 z-50 rounded-full bg-surface-container shadow-[0_4px_24px_rgba(0,0,0,0.6)] flex justify-around items-center h-14 px-3 transition-transform duration-300 ease-in-out ${hidden ? 'translate-y-[calc(100%+1rem)]' : 'translate-y-0'}`}>
       {items.map(({ to, icon, label }) => {
         const active = pathname === to
         return (

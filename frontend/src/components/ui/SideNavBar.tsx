@@ -1,14 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from './Icon'
 
 interface Props {
   children?: React.ReactNode
   onAddPin?: () => void
   pinOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function SideNavBar({ children, onAddPin, pinOpen }: Props) {
+export function SideNavBar({ children, onAddPin, pinOpen, onOpenChange }: Props) {
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
 
   return (
     <>
@@ -28,8 +33,10 @@ export function SideNavBar({ children, onAddPin, pinOpen }: Props) {
       )}
 
       <aside
-        className={`flex fixed left-0 top-12 h-[calc(100vh-48px-72px)] md:h-[calc(100vh-48px)] w-[280px] max-w-[85vw] bg-surface border-r border-outline-variant flex-col pt-16 pb-4 z-40 transition-transform duration-300 ease-in-out ${
-          open ? 'translate-x-0' : '-translate-x-full'
+        className={`flex fixed left-0 top-12 w-[280px] max-w-[85vw] bg-surface border-r border-outline-variant flex-col pt-16 pb-4 z-40 transition-all duration-300 ease-in-out ${
+          open
+            ? 'translate-x-0 h-[calc(100dvh-48px)]'
+            : '-translate-x-full h-[calc(100dvh-48px-72px)] md:h-[calc(100dvh-48px)]'
         }`}
       >
         {children ? (
