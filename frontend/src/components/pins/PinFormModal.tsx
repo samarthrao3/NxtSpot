@@ -49,14 +49,14 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
   const [photos, setPhotos] = useState<string[]>(pin?.photos ?? [])
   const [priceRange, setPriceRange] = useState<PriceRange | ''>(pin?.price_range ?? '')
   const [cuisineTags, setCuisineTags] = useState<string[]>(pin?.cuisine_tags ?? [])
-  const [rating, setRating] = useState<number>(pin?.rating ?? 0)
-  const [hoverRating, setHoverRating] = useState(0)
+  const [rating, setRating] = useState<string>(pin?.rating != null ? String(pin.rating) : '')
   const [uploadingCount, setUploadingCount] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const dragIndexRef = useRef<number | null>(null)
 
   // step 2
   const [reasoning, setReasoning] = useState<string[]>(pin?.reasoning ?? [])
+  const [customReasonInput, setCustomReasonInput] = useState('')
   const [mustOrderDishes, setMustOrderDishes] = useState<string[]>(
     pin?.must_order_dishes ?? (pin?.must_order ? [pin.must_order] : [''])
   )
@@ -120,7 +120,13 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
     let ok = true
     if (!restaurantName.trim()) { setNameError('Restaurant name is required'); ok = false } else setNameError('')
     if (!priceRange) { setPriceError('Price range is required'); ok = false } else setPriceError('')
-    if (!rating) { setRatingError('Rating is required'); ok = false } else setRatingError('')
+    const ratingNum = parseFloat(rating)
+    if (!rating.trim() || isNaN(ratingNum) || ratingNum < 0 || ratingNum > 5) {
+      setRatingError(!rating.trim() ? 'Rating is required' : 'Must be between 0 and 5')
+      ok = false
+    } else {
+      setRatingError('')
+    }
     return ok
   }
 
@@ -133,7 +139,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
     price_range: priceRange || null,
     must_order: null,
     note: note.trim() || null,
-    rating: rating || null,
+    rating: rating.trim() && !isNaN(parseFloat(rating)) ? parseFloat(rating) : null,
     price_per_head: null,
     cuisine_tags: cuisineTags.length ? cuisineTags : null,
     reasoning: reasoning.length ? reasoning : null,
@@ -219,26 +225,19 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
               {/* Rating */}
               <div className="flex flex-col gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">Your rating *</span>
-                <div className="flex gap-1 items-center">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => { setRating(star); if (ratingError) setRatingError('') }}
-                      onMouseEnter={() => setHoverRating(star)}
-                      onMouseLeave={() => setHoverRating(0)}
-                      className="transition-colors"
-                    >
-                      <Icon
-                        name="star"
-                        filled={(hoverRating || rating) >= star}
-                        className={`text-[28px] ${(hoverRating || rating) >= star ? 'text-primary' : 'text-outline-variant'}`}
-                      />
-                    </button>
-                  ))}
-                  {rating > 0 && (
-                    <span className="ml-2 font-headline-sm text-headline-sm text-on-surface">{rating}.0</span>
-                  )}
+                <div className="flex items-center gap-2">
+                  <Icon name="star" filled className="text-[20px] text-primary shrink-0" />
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={rating}
+                    onChange={(e) => { setRating(e.target.value); if (ratingError) setRatingError('') }}
+                    placeholder="4.3"
+                    className="w-24 border border-outline-variant px-3 py-2 font-headline-sm text-headline-sm bg-surface text-on-surface focus:outline-none focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="font-body-base text-body-base text-on-surface-variant">/ 5</span>
                 </div>
                 {ratingError && <span className="font-body-sm text-body-sm text-red-600">{ratingError}</span>}
               </div>
@@ -376,6 +375,50 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       </label>
                     )
                   })}
+                  {/* Custom reasons added by the user */}
+                  {reasoning.filter((r) => !(REASONING_OPTIONS as readonly string[]).includes(r)).map((r) => (
+                    <label key={r} className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked
+                        onChange={() => setReasoning(reasoning.filter((x) => x !== r))}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <span className="font-body-sm text-body-sm text-on-surface">{r}</span>
+                    </label>
+                  ))}
+                  {/* Add custom reason */}
+                  {reasoning.length < 3 && (
+                    <div className="flex gap-2 mt-1">
+                      <input
+                        type="text"
+                        value={customReasonInput}
+                        onChange={(e) => setCustomReasonInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const trimmed = customReasonInput.trim()
+                            if (trimmed && !reasoning.includes(trimmed)) setReasoning([...reasoning, trimmed])
+                            setCustomReasonInput('')
+                          }
+                        }}
+                        placeholder="Or type your own…"
+                        className="flex-1 border border-outline-variant px-3 py-1.5 font-body-sm text-body-sm bg-surface text-on-surface focus:outline-none focus:border-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const trimmed = customReasonInput.trim()
+                          if (trimmed && !reasoning.includes(trimmed)) setReasoning([...reasoning, trimmed])
+                          setCustomReasonInput('')
+                        }}
+                        disabled={!customReasonInput.trim()}
+                        className="px-3 py-1.5 border border-outline-variant font-label-caps text-label-caps text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-40"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
