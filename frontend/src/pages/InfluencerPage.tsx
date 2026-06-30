@@ -118,11 +118,48 @@ export function InfluencerPage() {
     if (!map.current || !pins) return
     markers.current.forEach((m) => m.remove())
     markers.current = []
+    const AMBER = '#ffc174'
+    const SURFACE = '#1c1b1b'
     pins.forEach((pin) => {
+      const ns = 'http://www.w3.org/2000/svg'
+      const svg = document.createElementNS(ns, 'svg')
+      svg.setAttribute('width', '26')
+      svg.setAttribute('height', '34')
+      svg.setAttribute('viewBox', '0 0 26 34')
+      svg.style.cssText = 'display:block;filter:drop-shadow(0 2px 10px rgba(255,193,116,0.45));cursor:pointer;'
+      const path = document.createElementNS(ns, 'path')
+      path.setAttribute('d', 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
+      path.setAttribute('fill', SURFACE)
+      path.setAttribute('stroke', AMBER)
+      path.setAttribute('stroke-width', '2.5')
+      svg.appendChild(path)
+      if (pin.rating != null) {
+        const t = document.createElementNS(ns, 'text')
+        t.setAttribute('x', '13')
+        t.setAttribute('y', '12')
+        t.setAttribute('text-anchor', 'middle')
+        t.setAttribute('dominant-baseline', 'central')
+        t.setAttribute('font-family', 'system-ui,sans-serif')
+        t.setAttribute('font-size', '8')
+        t.setAttribute('font-weight', '700')
+        t.setAttribute('fill', AMBER)
+        t.setAttribute('pointer-events', 'none')
+        t.textContent = pin.rating % 1 === 0 ? String(pin.rating) : pin.rating.toFixed(1)
+        svg.appendChild(t)
+      } else {
+        const dot = document.createElementNS(ns, 'circle')
+        dot.setAttribute('cx', '13')
+        dot.setAttribute('cy', '12')
+        dot.setAttribute('r', '4')
+        dot.setAttribute('fill', AMBER)
+        dot.setAttribute('fill-opacity', '0.8')
+        dot.setAttribute('pointer-events', 'none')
+        svg.appendChild(dot)
+      }
       const el = document.createElement('div')
-      el.className = 'w-3 h-3 bg-primary rounded-full border-2 border-surface cursor-pointer'
+      el.appendChild(svg)
       el.addEventListener('click', () => setSelectedPin(pin))
-      const marker = new mapboxgl.Marker({ element: el }).setLngLat([pin.lng, pin.lat]).addTo(map.current!)
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.lng, pin.lat]).addTo(map.current!)
       markers.current.push(marker)
     })
   }, [pins])
@@ -265,7 +302,7 @@ export function InfluencerPage() {
                     href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors border border-[#1A1A1A] flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors border border-primary flex items-center justify-center gap-2"
                   >
                     <Icon name="directions" className="text-[18px]" />
                     GET DIRECTIONS
