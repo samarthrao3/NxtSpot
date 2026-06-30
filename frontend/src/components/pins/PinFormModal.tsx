@@ -6,7 +6,7 @@ import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
 
 const PRICE_RANGES: PriceRange[] = ['₹', '₹₹', '₹₹₹']
-const CUISINE_TAGS = ['Biryani', 'North Indian', 'South Indian', 'Chinese', 'Continental', 'Street Food', 'Cafe', 'Desserts', 'Seafood', 'Bakery', 'Pizza', 'Beverages', 'Other'] as const
+const CUISINE_TAGS = ['Biryani', 'North Indian', 'South Indian', 'Chinese', 'Continental', 'Street Food', 'Cafe', 'Desserts', 'Seafood', 'Bakery', 'Pizza', 'Beverages'] as const
 const REASONING_OPTIONS = [
   "Best in Bangalore for this cuisine",
   "Unique dish you can't get elsewhere",
@@ -57,6 +57,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
   // step 2
   const [reasoning, setReasoning] = useState<string[]>(pin?.reasoning ?? [])
   const [customReasonInput, setCustomReasonInput] = useState('')
+  const [customCuisineInput, setCustomCuisineInput] = useState('')
   const [mustOrderDishes, setMustOrderDishes] = useState<string[]>(
     pin?.must_order_dishes ?? (pin?.must_order ? [pin.must_order] : [''])
   )
@@ -344,7 +345,49 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       </button>
                     )
                   })}
+                  {/* Custom cuisine tags */}
+                  {cuisineTags.filter((t) => !(CUISINE_TAGS as readonly string[]).includes(t)).map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setCuisineTags(cuisineTags.filter((t) => t !== tag))}
+                      className="px-3 py-1.5 border border-primary bg-primary text-on-primary font-label-caps text-label-caps transition-colors"
+                    >
+                      {tag} ×
+                    </button>
+                  ))}
                 </div>
+                {cuisineTags.length < 3 && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customCuisineInput}
+                      onChange={(e) => setCustomCuisineInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const trimmed = customCuisineInput.trim()
+                          if (trimmed && !cuisineTags.includes(trimmed)) setCuisineTags([...cuisineTags, trimmed])
+                          setCustomCuisineInput('')
+                        }
+                      }}
+                      placeholder="Or type your own…"
+                      className="flex-1 border border-outline-variant px-3 py-1.5 font-body-sm text-body-sm bg-surface text-on-surface focus:outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = customCuisineInput.trim()
+                        if (trimmed && !cuisineTags.includes(trimmed)) setCuisineTags([...cuisineTags, trimmed])
+                        setCustomCuisineInput('')
+                      }}
+                      disabled={!customCuisineInput.trim()}
+                      className="px-3 py-1.5 border border-outline-variant font-label-caps text-label-caps text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-40"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
               </div>
 
             </>
