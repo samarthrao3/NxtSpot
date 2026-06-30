@@ -539,9 +539,12 @@ function CuratorCard({
           <p className="text-white/50 uppercase mb-0.5 truncate" style={{ fontSize: 9, letterSpacing: '0.1em' }}>
             @{influencer.handle}
           </p>
-          <h2 className="font-display-lg text-white italic leading-tight mb-2 truncate" style={{ fontSize: 14, lineHeight: '18px' }}>
+          <h2 className="font-display-lg text-white italic leading-tight mb-1 truncate" style={{ fontSize: 14, lineHeight: '18px' }}>
             {influencer.name}
           </h2>
+          <p className="text-primary mb-2 truncate" style={{ fontSize: 9 }}>
+            {influencer.pin_count} spots · {influencer.follower_count} followers
+          </p>
           <button
             onClick={(e) => { e.stopPropagation(); onFollowClick() }}
             disabled={pending}
