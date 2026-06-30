@@ -13,8 +13,8 @@ import { useState, useEffect } from 'react'
 const CATEGORIES = ['All', 'Street Food', 'Coffee & Cafes', 'Local Gems', 'Fine Dining'] as const
 type Category = typeof CATEGORIES[number]
 
-// Cycle of heights for the masonry grid — creates Pinterest-style waterfall rhythm
-const ASPECT_CYCLE = ['120%', '88%', '140%', '100%', '112%', '80%', '130%', '95%']
+// Alternates tall/short dramatically so 2-col mobile reads as visibly different sizes
+const ASPECT_CYCLE = ['165%', '82%', '150%', '90%', '172%', '76%', '145%', '86%']
 
 function matchCategory(inf: Influencer, category: Category): boolean {
   if (category === 'All') return true
@@ -509,58 +509,48 @@ function CuratorCard({
 }) {
   const aspectPct = ASPECT_CYCLE[index % ASPECT_CYCLE.length]
   return (
-    <div className="break-inside-avoid mb-4">
-      <article onClick={onSelect} className="cursor-pointer group">
-        {/* Image — no border, rounded, variable height */}
-        <div
-          className={`relative w-full overflow-hidden rounded-2xl mb-3 transition-all ${
-            selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
-          }`}
-          style={{ paddingBottom: aspectPct }}
-        >
-          {influencer.avatar_url ? (
-            <img
-              src={influencer.avatar_url}
-              alt={influencer.name}
-              referrerPolicy="no-referrer"
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-surface-container-high flex items-center justify-center">
-              <span className="font-headline-md text-headline-md text-on-surface-variant italic">
-                {influencer.name[0]}
-              </span>
-            </div>
-          )}
-          {/* Hover overlay — visual feedback only, no action hidden behind it */}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
-        </div>
-
-        {/* Text + always-visible follow button */}
-        <div className="px-1 flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-[15px] font-semibold text-on-surface leading-tight mb-0.5 font-sans">
-              {influencer.name}
-            </h2>
-            <p className="font-body-sm text-body-sm text-secondary md:hidden">
-              {influencer.follower_count} followers
-            </p>
-            <p className="font-body-sm text-body-sm text-secondary md:hidden">
-              {influencer.pin_count} spots
-            </p>
-            <p className="font-body-sm text-body-sm text-secondary hidden md:block">
-              {influencer.pin_count} spots · {influencer.follower_count} followers
-            </p>
+    <div className="break-inside-avoid mb-3">
+      <article
+        onClick={onSelect}
+        className={`relative w-full overflow-hidden rounded-2xl cursor-pointer group ${
+          selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+        }`}
+        style={{ paddingBottom: aspectPct }}
+      >
+        {/* Full-bleed image */}
+        {influencer.avatar_url ? (
+          <img
+            src={influencer.avatar_url}
+            alt={influencer.name}
+            referrerPolicy="no-referrer"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-surface-container-high flex items-center justify-center">
+            <span className="font-headline-md text-headline-md text-on-surface-variant italic">
+              {influencer.name[0]}
+            </span>
           </div>
+        )}
+
+        {/* Gradient + text overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <p className="text-white/50 uppercase mb-0.5 truncate" style={{ fontSize: 9, letterSpacing: '0.1em' }}>
+            @{influencer.handle}
+          </p>
+          <h2 className="font-display-lg text-white italic leading-tight mb-2 truncate" style={{ fontSize: 14, lineHeight: '18px' }}>
+            {influencer.name}
+          </h2>
           <button
             onClick={(e) => { e.stopPropagation(); onFollowClick() }}
             disabled={pending}
-            className={`shrink-0 mt-0.5 rounded-full px-3 py-1 font-label-caps uppercase tracking-wider disabled:opacity-50 transition-colors whitespace-nowrap ${
+            className={`rounded-full px-3 py-1 font-label-caps uppercase tracking-wider disabled:opacity-50 transition-colors whitespace-nowrap ${
               following
                 ? 'bg-primary text-on-primary'
-                : 'bg-surface-container text-on-surface-variant hover:bg-primary hover:text-on-primary'
+                : 'bg-white/15 backdrop-blur-sm text-white hover:bg-primary hover:text-on-primary'
             }`}
-            style={{ fontSize: '9px' }}
+            style={{ fontSize: 9 }}
           >
             {following ? '✓ Following' : '+ Follow'}
           </button>
