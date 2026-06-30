@@ -8,7 +8,7 @@ import { TopNavBar } from '@/components/ui/TopNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 
 const CATEGORIES = ['All', 'Street Food', 'Coffee & Cafes', 'Local Gems', 'Fine Dining'] as const
 type Category = typeof CATEGORIES[number]
@@ -32,6 +32,7 @@ export function ExplorePage() {
   const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState<Category>('All')
+  const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
 
   const PAGE_SIZE = 12
   const MIN_VISIBLE = 6
@@ -72,7 +73,7 @@ export function ExplorePage() {
     ?.filter(
       (inf) =>
         inf.id !== currentUser?.id &&
-        !followingIds.has(inf.id) &&
+        (!followingIds.has(inf.id) || exitingIds.has(inf.id)) &&
         (!q || inf.name.toLowerCase().includes(q) || inf.handle.toLowerCase().includes(q)),
     )
     .sort((a, b) => (b.follower_count ?? 0) - (a.follower_count ?? 0))
@@ -158,6 +159,10 @@ export function ExplorePage() {
     if (followingIds.has(influencerId)) {
       unfollow.mutate(influencerId)
     } else {
+      setExitingIds((prev) => new Set([...prev, influencerId]))
+      setTimeout(() => {
+        setExitingIds((prev) => { const n = new Set(prev); n.delete(influencerId); return n })
+      }, 400)
       follow.mutate(influencerId)
       if (selectedInfluencer?.id === influencerId) setSelectedInfluencer(null)
     }
@@ -319,6 +324,7 @@ export function ExplorePage() {
                           index={i}
                           influencer={inf}
                           following={followingIds.has(inf.id)}
+                          isExiting={exitingIds.has(inf.id)}
                           selected={selectedInfluencer?.id === inf.id}
                           onSelect={() => setSelectedInfluencer(inf)}
                           onFollowClick={() => handleFollowClick(inf.id)}
@@ -493,6 +499,7 @@ export function ExplorePage() {
 function CuratorCard({
   influencer,
   following,
+  isExiting,
   selected,
   onSelect,
   onFollowClick,
@@ -501,6 +508,7 @@ function CuratorCard({
 }: {
   influencer: Influencer
   following: boolean
+  isExiting?: boolean
   selected: boolean
   onSelect: () => void
   onFollowClick: () => void
@@ -508,8 +516,28 @@ function CuratorCard({
   index: number
 }) {
   const aspectPct = ASPECT_CYCLE[index % ASPECT_CYCLE.length]
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const measuredHeight = useRef(0)
+  const [collapsing, setCollapsing] = useState(false)
+
+  useLayoutEffect(() => {
+    if (wrapperRef.current) measuredHeight.current = wrapperRef.current.offsetHeight
+  }, [])
+
+  useEffect(() => {
+    if (isExiting && !collapsing) requestAnimationFrame(() => setCollapsing(true))
+  }, [isExiting, collapsing])
+
   return (
-    <div className="break-inside-avoid mb-3">
+    <div
+      ref={wrapperRef}
+      className="break-inside-avoid overflow-hidden"
+      style={{
+        maxHeight: collapsing ? 0 : isExiting ? measuredHeight.current : undefined,
+        marginBottom: collapsing ? 0 : 12,
+        transition: collapsing ? 'max-height 0.22s ease-in, margin-bottom 0.18s ease-in' : undefined,
+      }}
+    >
       <article
         onClick={onSelect}
         className={`relative w-full overflow-hidden rounded-2xl cursor-pointer group ${
