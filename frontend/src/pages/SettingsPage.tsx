@@ -77,6 +77,12 @@ export function SettingsPage() {
     },
   })
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    qc.clear()
+    navigate('/explore')
+  }
+
   if (isLoading || !currentUser) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -86,123 +92,161 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col">
       <TopNavBar />
-      <main className="flex-1 mt-12 overflow-hidden px-margin-mobile md:px-margin-desktop pt-6 pb-20 md:pb-6">
-        <div className="max-w-xl mx-auto flex flex-col gap-4">
-          <h1 className="font-headline-md text-headline-md text-on-surface">Settings</h1>
+      <main className="flex-1 mt-12 px-margin-mobile md:px-margin-desktop pt-10 pb-24 md:pb-12 overflow-y-auto">
+        <div className="max-w-lg mx-auto flex flex-col gap-6">
 
-          <div className="flex flex-col gap-4 border border-outline-variant p-5 bg-surface">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full overflow-hidden border border-outline-variant bg-surface-container flex items-center justify-center shrink-0">
+          {/* Identity hero */}
+          <div className="flex flex-col items-center pt-4 pb-8">
+            <label className="relative cursor-pointer group mb-5">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-surface-container flex items-center justify-center">
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={avatarUrl} alt="Avatar" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="font-headline-sm text-headline-sm text-on-surface-variant">
+                  <span className="font-display-lg text-on-surface-variant italic" style={{ fontSize: 36 }}>
                     {(name || currentUser.email).charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
-              <label className="flex flex-col gap-1">
-                <span className="font-label-caps text-label-caps text-on-surface-variant">Avatar</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/heic"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleAvatarSelect(file)
-                  }}
-                  className="font-body-sm text-body-sm text-on-surface-variant"
-                />
-                {uploading && (
-                  <span className="flex items-center gap-2 font-body-sm text-body-sm text-secondary">
-                    <Spinner size={4} /> Uploading…
-                  </span>
-                )}
-                {uploadError && <span className="font-body-sm text-body-sm text-red-600">{uploadError}</span>}
-              </label>
-            </div>
+              {/* Change photo overlay */}
+              <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity font-label-caps text-white text-center leading-tight" style={{ fontSize: 9 }}>
+                  Change
+                </span>
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleAvatarSelect(file)
+                }}
+              />
+            </label>
 
-            <label className="flex flex-col gap-1">
+            {uploading && (
+              <span className="flex items-center gap-2 font-body-sm text-body-sm text-secondary mb-2">
+                <Spinner size={3} /> Uploading photo…
+              </span>
+            )}
+            {uploadError && <p className="font-body-sm text-body-sm text-red-400 mb-2">{uploadError}</p>}
+
+            <h1 className="font-display-lg text-on-surface italic leading-tight text-center" style={{ fontSize: 28 }}>
+              {name || 'Your name'}
+            </h1>
+            {currentUser.role === 'influencer' && handle && (
+              <p className="font-label-caps text-label-caps text-primary tracking-[0.15em] uppercase mt-1">
+                @{handle}
+              </p>
+            )}
+            <p className="font-body-sm text-body-sm text-secondary mt-1">{currentUser.email}</p>
+            {currentUser.role === 'influencer' && (
+              <span className="mt-3 rounded-full px-3 py-1 bg-primary/15 font-label-caps text-label-caps text-primary" style={{ fontSize: 9 }}>
+                ★ Curator
+              </span>
+            )}
+          </div>
+
+          {/* Profile fields */}
+          <div className="rounded-2xl bg-surface-container-lowest p-5 flex flex-col gap-4">
+            <p className="font-label-caps text-label-caps text-secondary uppercase tracking-wider">Profile</p>
+
+            <label className="flex flex-col gap-1.5">
               <span className="font-label-caps text-label-caps text-on-surface-variant">Name</span>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface"
+                placeholder="Your name"
+                className="rounded-xl bg-surface-container px-3 py-2.5 font-body-base text-body-base text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </label>
 
             {currentUser.role === 'influencer' && (
-              <label className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1.5">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">Handle</span>
-                <div className="flex items-center border border-outline-variant bg-surface">
-                  <span className="px-3 font-body-base text-body-base text-secondary">@</span>
+                <div className="flex items-center rounded-xl bg-surface-container overflow-hidden focus-within:ring-1 focus-within:ring-primary">
+                  <span className="pl-3 pr-1 font-body-base text-body-base text-secondary select-none">@</span>
                   <input
                     type="text"
                     value={handle}
                     onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className="flex-1 py-2 pr-3 font-body-base text-body-base bg-surface text-on-surface outline-none"
+                    placeholder="yourhandle"
+                    className="flex-1 py-2.5 pr-3 font-body-base text-body-base bg-transparent text-on-surface focus:outline-none"
                   />
                 </div>
               </label>
             )}
 
             {save.isError && (
-              <p className="font-body-sm text-body-sm text-red-600">
+              <p className="font-body-sm text-body-sm text-red-400">
                 {save.error instanceof Error ? save.error.message : 'Could not save changes.'}
               </p>
             )}
-            {saveMessage && <p className="font-body-sm text-body-sm text-primary">{saveMessage}</p>}
 
             <button
               onClick={() => save.mutate()}
               disabled={save.isPending || uploading}
-              className="w-full py-3 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors border border-[#1A1A1A] disabled:opacity-50"
+              className="w-full rounded-xl py-2.5 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {save.isPending ? 'Saving…' : 'Save Changes'}
+              {save.isPending ? <><Spinner size={4} /> Saving…</> : saveMessage ? '✓ Saved' : 'Save changes'}
             </button>
           </div>
 
-          <div className="border border-red-300 p-5 bg-surface flex flex-col gap-3">
-            <h2 className="font-headline-sm text-headline-sm text-red-600">Delete Account</h2>
-            <p className="font-body-base text-body-base text-secondary">
-              This permanently deletes your account, pins, follows, and saved places. This cannot be undone.
+          {/* Account actions */}
+          <div className="rounded-2xl bg-surface-container-lowest p-5 flex flex-col gap-3">
+            <p className="font-label-caps text-label-caps text-secondary uppercase tracking-wider">Account</p>
+            <button
+              onClick={handleSignOut}
+              className="w-full rounded-xl py-2.5 bg-surface-container font-label-caps text-label-caps text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
+
+          {/* Danger zone — demoted, not alarming */}
+          <div className="px-1 pb-4">
+            <p className="font-label-caps text-label-caps text-secondary uppercase tracking-wider mb-3">Danger zone</p>
+            <p className="font-body-sm text-body-sm text-secondary leading-relaxed mb-4">
+              Deleting your account permanently removes your profile, pins, follows, and saved places. This cannot be undone.
             </p>
 
             {!confirmingDelete ? (
               <button
                 onClick={() => setConfirmingDelete(true)}
-                className="self-start font-label-caps text-label-caps uppercase tracking-wider text-red-600 hover:text-red-700 transition-colors"
+                className="font-label-caps text-label-caps text-red-400/70 hover:text-red-400 uppercase tracking-wider transition-colors"
               >
                 Delete my account
               </button>
             ) : (
-              <div className="flex flex-col gap-3">
-                <p className="font-body-base text-body-base text-on-surface">
-                  Are you sure? This cannot be undone.
+              <div className="rounded-2xl bg-red-950/30 p-4 flex flex-col gap-3">
+                <p className="font-body-sm text-body-sm text-on-surface">
+                  Are you sure? There's no going back.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <button
                     onClick={() => deleteAccount.mutate()}
                     disabled={deleteAccount.isPending}
-                    className="py-2 px-4 bg-red-600 text-white font-label-caps text-label-caps uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50"
+                    className="rounded-xl px-4 py-2 bg-red-600 text-white font-label-caps text-label-caps uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50"
                   >
-                    {deleteAccount.isPending ? 'Deleting…' : 'Yes, delete my account'}
+                    {deleteAccount.isPending ? 'Deleting…' : 'Yes, delete'}
                   </button>
                   <button
                     onClick={() => setConfirmingDelete(false)}
-                    className="py-2 px-4 border border-outline-variant font-label-caps text-label-caps uppercase tracking-wider text-on-surface hover:bg-surface-container transition-colors"
+                    className="rounded-xl px-4 py-2 bg-surface-container font-label-caps text-label-caps text-on-surface-variant hover:bg-surface-container-high transition-colors"
                   >
                     Cancel
                   </button>
                 </div>
                 {deleteAccount.isError && (
-                  <p className="font-body-sm text-body-sm text-red-600">Could not delete account. Try again.</p>
+                  <p className="font-body-sm text-body-sm text-red-400">Could not delete account. Try again.</p>
                 )}
               </div>
             )}
           </div>
+
         </div>
       </main>
       <BottomNavBar />

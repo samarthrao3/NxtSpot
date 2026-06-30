@@ -37,11 +37,23 @@ function toggleItem<T>(arr: T[], item: T, max: number): T[] {
   return [...arr, item]
 }
 
+// Shared class builders
+const pillBase = 'font-label-caps text-label-caps transition-colors rounded-full px-4 py-2'
+const pillActive = 'bg-primary text-on-primary'
+const pillInactive = 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
+const pillDisabled = 'bg-surface-container text-secondary cursor-not-allowed opacity-50'
+
+const blockBase = 'font-body-sm text-body-sm transition-colors rounded-xl px-4 py-2.5 text-left'
+const blockActive = 'bg-primary text-on-primary'
+const blockInactive = 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+
+const inputClass = 'rounded-xl bg-surface-container px-3 py-2.5 font-body-base text-body-base text-on-surface focus:outline-none focus:ring-1 focus:ring-primary w-full'
+const textareaClass = 'rounded-xl bg-surface-container px-3 py-2.5 font-body-base text-body-base text-on-surface resize-none focus:outline-none focus:ring-1 focus:ring-primary w-full'
+
 export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }: Props) {
   const isEditing = !!pin
   const qc = useQueryClient()
 
-  // step
   const [step, setStep] = useState<1 | 2 | 3>(1)
 
   // step 1
@@ -175,58 +187,60 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
   const canPublish = !isUploading && !submit.isPending
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-surface border border-outline-variant w-full max-w-md max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 p-0 md:p-4">
+      <div className="bg-surface rounded-t-2xl md:rounded-2xl overflow-hidden w-full md:max-w-md max-h-[92vh] flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="flex justify-between items-center px-4 py-3 border-b border-outline-variant shrink-0">
-          <h2 className="font-headline-sm text-headline-sm text-on-surface">
-            {isEditing ? 'Edit Pin' : 'Add a Pin'}
-          </h2>
-          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition-colors">
+        <div className="flex justify-between items-center px-5 pt-5 pb-3 shrink-0">
+          <div>
+            <h2 className="font-headline-sm text-headline-sm text-on-surface">
+              {isEditing ? 'Edit spot' : 'Add a spot'}
+            </h2>
+            <p className="font-label-caps text-label-caps text-secondary mt-0.5">
+              Step {step} of 3
+            </p>
+          </div>
+          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface transition-colors p-1">
             <Icon name="close" />
           </button>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-3 py-3 border-b border-outline-variant shrink-0">
-          {([1, 2, 3] as const).map((s) => (
-            <div key={s} className="flex items-center gap-3">
+        {/* Step indicator — progress bar style */}
+        <div className="px-5 pb-4 shrink-0">
+          <div className="flex gap-1.5">
+            {([1, 2, 3] as const).map((s) => (
               <div
-                className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                  s < step ? 'bg-primary' : s === step ? 'bg-primary border-2 border-primary ring-2 ring-primary/20' : 'bg-outline-variant'
+                key={s}
+                className={`h-1 flex-1 rounded-full transition-colors ${
+                  s <= step ? 'bg-primary' : 'bg-surface-container-high'
                 }`}
               />
-              {s < 3 && <div className={`w-8 h-px ${s < step ? 'bg-primary' : 'bg-outline-variant'}`} />}
-            </div>
-          ))}
-          <span className="ml-1 font-label-caps text-label-caps text-secondary uppercase">
-            Step {step} of 3
-          </span>
+            ))}
+          </div>
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-4 py-4 flex flex-col gap-4">
+        <div className="overflow-y-auto flex-1 px-5 pb-4 flex flex-col gap-5">
 
-          {/* ── STEP 1 ─────────────────────────────────── */}
+          {/* ── STEP 1 ── */}
           {step === 1 && (
             <>
-              <label className="flex flex-col gap-1">
-                <span className="font-label-caps text-label-caps text-on-surface-variant">Restaurant Name *</span>
+              <label className="flex flex-col gap-1.5">
+                <span className="font-label-caps text-label-caps text-on-surface-variant">Restaurant name *</span>
                 <input
                   type="text"
                   value={restaurantName}
                   onChange={(e) => { setRestaurantName(e.target.value); if (nameError) setNameError('') }}
-                  className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface focus:outline-none focus:border-primary"
+                  className={inputClass}
                   placeholder="e.g. Meghana Foods"
                 />
-                {nameError && <span className="font-body-sm text-body-sm text-red-600">{nameError}</span>}
+                {nameError && <span className="font-body-sm text-body-sm text-red-400">{nameError}</span>}
               </label>
 
               {/* Rating */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">Your rating *</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Icon name="star" filled className="text-[20px] text-primary shrink-0" />
                   <input
                     type="number"
@@ -236,17 +250,17 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                     value={rating}
                     onChange={(e) => { setRating(e.target.value); if (ratingError) setRatingError('') }}
                     placeholder="4.3"
-                    className="w-24 border border-outline-variant px-3 py-2 font-headline-sm text-headline-sm bg-surface text-on-surface focus:outline-none focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-28 rounded-xl bg-surface-container px-3 py-2.5 font-headline-sm text-headline-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="font-body-base text-body-base text-on-surface-variant">/ 5</span>
                 </div>
-                {ratingError && <span className="font-body-sm text-body-sm text-red-600">{ratingError}</span>}
+                {ratingError && <span className="font-body-sm text-body-sm text-red-400">{ratingError}</span>}
               </div>
 
               {/* Photos */}
               <div className="flex flex-col gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">
-                  Photos <span className="normal-case text-secondary">(up to 5 · drag to reorder · first is cover)</span>
+                  Photos <span className="normal-case text-secondary font-sans font-normal">(up to 5 · drag to reorder · first is cover)</span>
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {photos.map((url, i) => (
@@ -256,25 +270,25 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       onDragStart={() => onDragStart(i)}
                       onDragOver={(e) => onDragOver(e, i)}
                       onDragEnd={onDragEnd}
-                      className="relative w-20 h-20 border border-outline-variant cursor-grab active:cursor-grabbing group"
+                      className="relative w-20 h-20 rounded-xl overflow-hidden cursor-grab active:cursor-grabbing group"
                     >
                       <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
                       {i === 0 && (
-                        <span className="absolute bottom-0 left-0 right-0 bg-primary/80 text-white text-[9px] font-bold text-center py-0.5">
+                        <span className="absolute bottom-0 left-0 right-0 bg-primary/80 text-on-primary text-[9px] font-bold text-center py-0.5 font-sans">
                           COVER
                         </span>
                       )}
                       <button
                         type="button"
                         onClick={() => removePhoto(i)}
-                        className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[11px]"
                       >
                         ×
                       </button>
                     </div>
                   ))}
                   {photos.length < 5 && (
-                    <label className="w-20 h-20 border border-dashed border-outline-variant flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors bg-surface-container-low">
+                    <label className="w-20 h-20 rounded-xl border border-dashed border-outline-variant flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors bg-surface-container-low">
                       {isUploading ? (
                         <Spinner size={5} />
                       ) : (
@@ -293,7 +307,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                     </label>
                   )}
                 </div>
-                {uploadError && <span className="font-body-sm text-body-sm text-red-600">{uploadError}</span>}
+                {uploadError && <span className="font-body-sm text-body-sm text-red-400">{uploadError}</span>}
               </div>
 
               {/* Price range */}
@@ -305,23 +319,19 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       key={p}
                       type="button"
                       onClick={() => { setPriceRange(p); if (priceError) setPriceError('') }}
-                      className={`px-4 py-1.5 border font-label-caps text-label-caps transition-colors ${
-                        priceRange === p
-                          ? 'border-primary bg-primary text-on-primary'
-                          : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
-                      }`}
+                      className={`${pillBase} ${priceRange === p ? pillActive : pillInactive}`}
                     >
                       {p}
                     </button>
                   ))}
                 </div>
-                {priceError && <span className="font-body-sm text-body-sm text-red-600">{priceError}</span>}
+                {priceError && <span className="font-body-sm text-body-sm text-red-400">{priceError}</span>}
               </div>
 
               {/* Cuisine tags */}
               <div className="flex flex-col gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">
-                  Cuisine tags <span className="normal-case text-secondary">(pick 1–3)</span>
+                  Cuisine <span className="normal-case text-secondary font-sans font-normal">(pick 1–3)</span>
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {CUISINE_TAGS.map((tag) => {
@@ -333,25 +343,18 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                         type="button"
                         disabled={maxed}
                         onClick={() => setCuisineTags(toggleItem(cuisineTags, tag, 3))}
-                        className={`px-3 py-1.5 border font-label-caps text-label-caps transition-colors ${
-                          selected
-                            ? 'border-primary bg-primary text-on-primary'
-                            : maxed
-                            ? 'border-outline-variant text-outline-variant cursor-not-allowed'
-                            : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
-                        }`}
+                        className={`${pillBase} ${selected ? pillActive : maxed ? pillDisabled : pillInactive}`}
                       >
                         {tag}
                       </button>
                     )
                   })}
-                  {/* Custom cuisine tags */}
                   {cuisineTags.filter((t) => !(CUISINE_TAGS as readonly string[]).includes(t)).map((tag) => (
                     <button
                       key={tag}
                       type="button"
                       onClick={() => setCuisineTags(cuisineTags.filter((t) => t !== tag))}
-                      className="px-3 py-1.5 border border-primary bg-primary text-on-primary font-label-caps text-label-caps transition-colors"
+                      className={`${pillBase} ${pillActive}`}
                     >
                       {tag} ×
                     </button>
@@ -371,8 +374,8 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                           setCustomCuisineInput('')
                         }
                       }}
-                      placeholder="Or type your own…"
-                      className="flex-1 border border-outline-variant px-3 py-1.5 font-body-sm text-body-sm bg-surface text-on-surface focus:outline-none focus:border-primary"
+                      placeholder="Type your own…"
+                      className="flex-1 rounded-xl bg-surface-container px-3 py-2 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                     <button
                       type="button"
@@ -382,55 +385,50 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                         setCustomCuisineInput('')
                       }}
                       disabled={!customCuisineInput.trim()}
-                      className="px-3 py-1.5 border border-outline-variant font-label-caps text-label-caps text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-40"
+                      className="rounded-full px-4 py-2 bg-surface-container font-label-caps text-label-caps text-on-surface-variant hover:bg-primary hover:text-on-primary transition-colors disabled:opacity-40"
                     >
                       Add
                     </button>
                   </div>
                 )}
               </div>
-
             </>
           )}
 
-          {/* ── STEP 2 ─────────────────────────────────── */}
+          {/* ── STEP 2 ── */}
           {step === 2 && (
             <>
-              {/* Spotter's Reasoning */}
+              {/* Reasoning — pill-toggle buttons */}
               <div className="flex flex-col gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">
-                  Why are you recommending this? <span className="normal-case text-secondary">(pick 1–3)</span>
+                  Why are you recommending this? <span className="normal-case text-secondary font-sans font-normal">(pick 1–3)</span>
                 </span>
                 <div className="flex flex-col gap-2">
                   {REASONING_OPTIONS.map((r) => {
                     const checked = reasoning.includes(r)
                     const maxed = reasoning.length >= 3 && !checked
                     return (
-                      <label key={r} className={`flex items-center gap-3 cursor-pointer ${maxed ? 'opacity-40' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={maxed}
-                          onChange={() => setReasoning(toggleItem(reasoning, r, 3))}
-                          className="w-4 h-4 accent-primary"
-                        />
-                        <span className="font-body-sm text-body-sm text-on-surface">{r}</span>
-                      </label>
+                      <button
+                        key={r}
+                        type="button"
+                        disabled={maxed}
+                        onClick={() => setReasoning(toggleItem(reasoning, r, 3))}
+                        className={`${blockBase} ${checked ? blockActive : blockInactive} ${maxed ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        {r}
+                      </button>
                     )
                   })}
-                  {/* Custom reasons added by the user */}
                   {reasoning.filter((r) => !(REASONING_OPTIONS as readonly string[]).includes(r)).map((r) => (
-                    <label key={r} className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked
-                        onChange={() => setReasoning(reasoning.filter((x) => x !== r))}
-                        className="w-4 h-4 accent-primary"
-                      />
-                      <span className="font-body-sm text-body-sm text-on-surface">{r}</span>
-                    </label>
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setReasoning(reasoning.filter((x) => x !== r))}
+                      className={`${blockBase} ${blockActive}`}
+                    >
+                      {r} ×
+                    </button>
                   ))}
-                  {/* Add custom reason */}
                   {reasoning.length < 3 && (
                     <div className="flex gap-2 mt-1">
                       <input
@@ -446,7 +444,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                           }
                         }}
                         placeholder="Or type your own…"
-                        className="flex-1 border border-outline-variant px-3 py-1.5 font-body-sm text-body-sm bg-surface text-on-surface focus:outline-none focus:border-primary"
+                        className="flex-1 rounded-xl bg-surface-container px-3 py-2 font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                       <button
                         type="button"
@@ -456,7 +454,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                           setCustomReasonInput('')
                         }}
                         disabled={!customReasonInput.trim()}
-                        className="px-3 py-1.5 border border-outline-variant font-label-caps text-label-caps text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-40"
+                        className="rounded-full px-4 py-2 bg-surface-container font-label-caps text-label-caps text-on-surface-variant hover:bg-primary hover:text-on-primary transition-colors disabled:opacity-40"
                       >
                         Add
                       </button>
@@ -479,7 +477,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       updated[i] = e.target.value
                       setMustOrderDishes(updated)
                     }}
-                    className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface focus:outline-none focus:border-primary"
+                    className={inputClass}
                   />
                 ))}
                 {dishCount < 3 && (
@@ -494,31 +492,31 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
               </div>
 
               {/* Note */}
-              <label className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1.5">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">Your note</span>
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value.slice(0, 280))}
                   rows={3}
                   placeholder="What makes this place worth visiting?"
-                  className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface resize-none focus:outline-none focus:border-primary"
+                  className={textareaClass}
                 />
-                <span className={`font-label-caps text-label-caps self-end ${note.length >= 260 ? 'text-red-500' : 'text-secondary'}`}>
+                <span className={`font-label-caps text-label-caps self-end ${note.length >= 260 ? 'text-red-400' : 'text-secondary'}`}>
                   {note.length}/280
                 </span>
               </label>
 
               {/* Insider tip */}
-              <label className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1.5">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">Insider tip</span>
                 <textarea
                   value={insiderTip}
                   onChange={(e) => setInsiderTip(e.target.value.slice(0, 200))}
                   rows={2}
                   placeholder="The secret menu item, which table to ask for, when to avoid the queue…"
-                  className="border border-outline-variant px-3 py-2 font-body-base text-body-base bg-surface text-on-surface resize-none focus:outline-none focus:border-primary"
+                  className={textareaClass}
                 />
-                <span className={`font-label-caps text-label-caps self-end ${insiderTip.length >= 180 ? 'text-red-500' : 'text-secondary'}`}>
+                <span className={`font-label-caps text-label-caps self-end ${insiderTip.length >= 180 ? 'text-red-400' : 'text-secondary'}`}>
                   {insiderTip.length}/200
                 </span>
               </label>
@@ -532,11 +530,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       key={w}
                       type="button"
                       onClick={() => setWouldReturn(wouldReturn === w ? '' : w)}
-                      className={`px-3 py-1.5 border font-label-caps text-label-caps transition-colors ${
-                        wouldReturn === w
-                          ? 'border-primary bg-primary text-on-primary'
-                          : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
-                      }`}
+                      className={`${pillBase} ${wouldReturn === w ? pillActive : pillInactive}`}
                     >
                       {w}
                     </button>
@@ -546,48 +540,45 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
             </>
           )}
 
-          {/* ── STEP 3 ─────────────────────────────────── */}
+          {/* ── STEP 3 ── */}
           {step === 3 && (
             <>
-              {/* Best time */}
+              {/* Best time — pill-toggle single select */}
               <div className="flex flex-col gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">Best time to visit</span>
                 <div className="flex flex-col gap-2">
                   {BEST_TIME.map((t) => (
-                    <label key={t} className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="best_time"
-                        checked={bestTime === t}
-                        onChange={() => setBestTime(t)}
-                        className="accent-primary"
-                      />
-                      <span className="font-body-sm text-body-sm text-on-surface">{t}</span>
-                    </label>
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setBestTime(bestTime === t ? '' : t)}
+                      className={`${blockBase} ${bestTime === t ? blockActive : blockInactive}`}
+                    >
+                      {t}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Best for */}
+              {/* Best for — pill-toggle multi select */}
               <div className="flex flex-col gap-2">
                 <span className="font-label-caps text-label-caps text-on-surface-variant">
-                  Best for <span className="normal-case text-secondary">(up to 3)</span>
+                  Best for <span className="normal-case text-secondary font-sans font-normal">(up to 3)</span>
                 </span>
                 <div className="flex flex-col gap-2">
                   {BEST_FOR.map((b) => {
                     const checked = bestFor.includes(b)
                     const maxed = bestFor.length >= 3 && !checked
                     return (
-                      <label key={b} className={`flex items-center gap-3 cursor-pointer ${maxed ? 'opacity-40' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={maxed}
-                          onChange={() => setBestFor(toggleItem(bestFor, b, 3))}
-                          className="w-4 h-4 accent-primary"
-                        />
-                        <span className="font-body-sm text-body-sm text-on-surface">{b}</span>
-                      </label>
+                      <button
+                        key={b}
+                        type="button"
+                        disabled={maxed}
+                        onClick={() => setBestFor(toggleItem(bestFor, b, 3))}
+                        className={`${blockBase} ${checked ? blockActive : blockInactive} ${maxed ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        {b}
+                      </button>
                     )
                   })}
                 </div>
@@ -602,11 +593,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                       key={v}
                       type="button"
                       onClick={() => setVibeTag(vibeTag === v ? '' : v)}
-                      className={`px-3 py-1.5 border font-label-caps text-label-caps transition-colors ${
-                        vibeTag === v
-                          ? 'border-primary bg-primary text-on-primary'
-                          : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
-                      }`}
+                      className={`${pillBase} ${vibeTag === v ? pillActive : pillInactive}`}
                     >
                       {v}
                     </button>
@@ -617,20 +604,20 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
           )}
 
           {submit.isError && (
-            <p className="font-body-sm text-body-sm text-red-600">
+            <p className="font-body-sm text-body-sm text-red-400">
               {submit.error instanceof Error ? submit.error.message : 'Could not save pin.'}
             </p>
           )}
         </div>
 
-        {/* Footer buttons */}
-        <div className="border-t border-outline-variant px-4 py-3 flex flex-col gap-2 shrink-0">
+        {/* Footer — tone shift instead of border line */}
+        <div className="bg-surface-container-lowest px-5 py-4 flex flex-col gap-2 shrink-0">
           <div className="flex gap-2">
             {step > 1 && (
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-4 py-2.5 border border-outline-variant font-label-caps text-label-caps text-on-surface hover:bg-surface-container-low transition-colors"
+                className="rounded-xl px-4 py-2.5 bg-surface-container font-label-caps text-label-caps text-on-surface hover:bg-surface-container-high transition-colors"
               >
                 Back
               </button>
@@ -640,7 +627,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex-1 py-2.5 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors"
+                className="flex-1 rounded-xl py-2.5 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors"
               >
                 Next →
               </button>
@@ -650,7 +637,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="px-4 py-2.5 border border-outline-variant font-label-caps text-label-caps text-secondary hover:text-on-surface transition-colors"
+                className="rounded-xl px-4 py-2.5 bg-surface-container font-label-caps text-label-caps text-secondary hover:text-on-surface transition-colors"
               >
                 Skip
               </button>
@@ -662,7 +649,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                   type="button"
                   onClick={() => submit.mutate()}
                   disabled={!canPublish}
-                  className="flex-1 py-2.5 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 rounded-xl py-2.5 bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submit.isPending ? <><Spinner size={4} /> Publishing…</> : 'Publish'}
                 </button>
@@ -670,7 +657,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                   type="button"
                   onClick={() => submit.mutate()}
                   disabled={!canPublish}
-                  className="px-4 py-2.5 border border-outline-variant font-label-caps text-label-caps text-secondary hover:text-on-surface transition-colors disabled:opacity-50"
+                  className="rounded-xl px-4 py-2.5 bg-surface-container font-label-caps text-label-caps text-secondary hover:text-on-surface transition-colors disabled:opacity-50"
                 >
                   Skip &amp; Publish
                 </button>
@@ -683,9 +670,9 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
               type="button"
               onClick={handlePublishEarly}
               disabled={!canPublish}
-              className="w-full py-2 border border-outline-variant font-label-caps text-label-caps text-secondary hover:text-on-surface transition-colors disabled:opacity-50"
+              className="w-full rounded-xl py-2.5 bg-surface-container font-label-caps text-label-caps text-secondary hover:text-on-surface transition-colors disabled:opacity-50"
             >
-              {submit.isPending ? 'Publishing…' : 'Publish (add details later)'}
+              {submit.isPending ? 'Publishing…' : 'Publish now (add details later)'}
             </button>
           )}
         </div>

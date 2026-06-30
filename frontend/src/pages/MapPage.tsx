@@ -246,22 +246,37 @@ export function MapPage() {
           const count = visiblePins.length
           const primary = visiblePins[0]
           const isMulti = count > 1
-          const color = isMulti ? '#2E5FA3' : colorForId(primary.influencer_id)
-          const pinW = isMulti ? 24 : 20
-          const pinH = isMulti ? 32 : 28
+          // Single: solid influencer color + colored glow (lantern on dark map). Multi: solid amber + amber glow.
+          const AMBER = '#ffc174'
+          const AMBER_DARK = '#472a00'
+          const pinColor = colorForId(primary.influencer_id)
+          const pr = parseInt(pinColor.slice(1, 3), 16)
+          const pg = parseInt(pinColor.slice(3, 5), 16)
+          const pb = parseInt(pinColor.slice(5, 7), 16)
+          const pinGlow = `rgba(${pr},${pg},${pb},0.55)`
+          const pinW = isMulti ? 32 : 26
+          const pinH = isMulti ? 42 : 34
           const ns = 'http://www.w3.org/2000/svg'
           const svg = document.createElementNS(ns, 'svg')
           svg.setAttribute('width', String(pinW))
           svg.setAttribute('height', String(pinH))
           svg.setAttribute('viewBox', `0 0 ${pinW} ${pinH}`)
-          svg.style.cssText = 'display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.35));'
+          svg.style.cssText = isMulti
+            ? 'display:block;filter:drop-shadow(0 2px 10px rgba(255,193,116,0.45));'
+            : `display:block;filter:drop-shadow(0 2px 10px ${pinGlow});`
           const pathEl = document.createElementNS(ns, 'path')
           pathEl.setAttribute('d', isMulti
-            ? 'M12,0 C5.37,0 0,5.37 0,11 C0,19.75 12,32 12,32 C12,32 24,19.75 24,11 C24,5.37 18.63,0 12,0 Z'
-            : 'M10,0 C4.48,0 0,4.48 0,9 C0,16.5 10,28 10,28 C10,28 20,16.5 20,9 C20,4.48 15.52,0 10,0 Z')
-          pathEl.setAttribute('fill', color)
-          pathEl.setAttribute('stroke', 'white')
-          pathEl.setAttribute('stroke-width', '1.5')
+            ? 'M16,2 C8.27,2 2,8.27 2,16 C2,26.75 16,42 16,42 C16,42 30,26.75 30,16 C30,8.27 23.73,2 16,2 Z'
+            : 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
+          if (isMulti) {
+            pathEl.setAttribute('fill', AMBER)
+            pathEl.setAttribute('stroke', AMBER_DARK)
+            pathEl.setAttribute('stroke-width', '1.5')
+          } else {
+            pathEl.setAttribute('fill', pinColor)
+            pathEl.setAttribute('stroke', 'rgba(255,255,255,0.7)')
+            pathEl.setAttribute('stroke-width', '1.5')
+          }
           svg.appendChild(pathEl)
           const ratedPins = visiblePins.filter((p) => p.rating != null)
           const avgRating = ratedPins.length > 0
@@ -270,41 +285,39 @@ export function MapPage() {
           const formatRating = (r: number) => r % 1 === 0 ? String(r) : r.toFixed(1)
 
           if (isMulti) {
-            if (avgRating != null) {
-              const t = document.createElementNS(ns, 'text')
-              t.setAttribute('x', '12')
-              t.setAttribute('y', '11')
-              t.setAttribute('text-anchor', 'middle')
-              t.setAttribute('dominant-baseline', 'central')
-              t.setAttribute('font-family', 'system-ui,sans-serif')
-              t.setAttribute('font-size', '7')
-              t.setAttribute('font-weight', '700')
-              t.setAttribute('fill', 'white')
-              t.setAttribute('pointer-events', 'none')
-              t.textContent = '★' + formatRating(avgRating)
-              svg.appendChild(t)
-            }
+            const t = document.createElementNS(ns, 'text')
+            t.setAttribute('x', '16')
+            t.setAttribute('y', '16')
+            t.setAttribute('text-anchor', 'middle')
+            t.setAttribute('dominant-baseline', 'central')
+            t.setAttribute('font-family', 'system-ui,sans-serif')
+            t.setAttribute('font-size', '8.5')
+            t.setAttribute('font-weight', '700')
+            t.setAttribute('fill', AMBER_DARK)
+            t.setAttribute('pointer-events', 'none')
+            t.textContent = avgRating != null ? '★' + formatRating(avgRating) : '★'
+            svg.appendChild(t)
           } else {
             if (primary.rating != null) {
               const t = document.createElementNS(ns, 'text')
-              t.setAttribute('x', '10')
-              t.setAttribute('y', '9')
+              t.setAttribute('x', '13')
+              t.setAttribute('y', '12')
               t.setAttribute('text-anchor', 'middle')
               t.setAttribute('dominant-baseline', 'central')
               t.setAttribute('font-family', 'system-ui,sans-serif')
-              t.setAttribute('font-size', '6')
+              t.setAttribute('font-size', '8')
               t.setAttribute('font-weight', '700')
               t.setAttribute('fill', 'white')
               t.setAttribute('pointer-events', 'none')
-              t.textContent = '★' + formatRating(primary.rating)
+              t.textContent = formatRating(primary.rating)
               svg.appendChild(t)
             } else {
               const dot = document.createElementNS(ns, 'circle')
-              dot.setAttribute('cx', '10')
-              dot.setAttribute('cy', '9')
-              dot.setAttribute('r', '3.5')
+              dot.setAttribute('cx', '13')
+              dot.setAttribute('cy', '12')
+              dot.setAttribute('r', '4')
               dot.setAttribute('fill', 'white')
-              dot.setAttribute('fill-opacity', '0.5')
+              dot.setAttribute('fill-opacity', '0.9')
               dot.setAttribute('pointer-events', 'none')
               svg.appendChild(dot)
             }
@@ -374,26 +387,45 @@ export function MapPage() {
       ownPins?.forEach((pin) => {
         if (hiddenIds.has(pin.influencer_id)) return
         const ownColor = colorForId(pin.influencer_id)
+        const or = parseInt(ownColor.slice(1, 3), 16)
+        const og = parseInt(ownColor.slice(3, 5), 16)
+        const ob = parseInt(ownColor.slice(5, 7), 16)
+        const ownGlow = `rgba(${or},${og},${ob},0.55)`
         const sns = 'http://www.w3.org/2000/svg'
         const ownSvg = document.createElementNS(sns, 'svg')
-        ownSvg.setAttribute('width', '20')
-        ownSvg.setAttribute('height', '28')
-        ownSvg.setAttribute('viewBox', '0 0 20 28')
-        ownSvg.style.cssText = 'display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.35));'
+        ownSvg.setAttribute('width', '26')
+        ownSvg.setAttribute('height', '34')
+        ownSvg.setAttribute('viewBox', '0 0 26 34')
+        ownSvg.style.cssText = `display:block;filter:drop-shadow(0 2px 10px ${ownGlow});`
         const ownPath = document.createElementNS(sns, 'path')
-        ownPath.setAttribute('d', 'M10,0 C4.48,0 0,4.48 0,9 C0,16.5 10,28 10,28 C10,28 20,16.5 20,9 C20,4.48 15.52,0 10,0 Z')
+        ownPath.setAttribute('d', 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
         ownPath.setAttribute('fill', ownColor)
-        ownPath.setAttribute('stroke', 'white')
+        ownPath.setAttribute('stroke', 'rgba(255,255,255,0.7)')
         ownPath.setAttribute('stroke-width', '1.5')
         ownSvg.appendChild(ownPath)
-        const ownDot = document.createElementNS(sns, 'circle')
-        ownDot.setAttribute('cx', '10')
-        ownDot.setAttribute('cy', '9')
-        ownDot.setAttribute('r', '3.5')
-        ownDot.setAttribute('fill', 'white')
-        ownDot.setAttribute('fill-opacity', '0.5')
-        ownDot.setAttribute('pointer-events', 'none')
-        ownSvg.appendChild(ownDot)
+        if (pin.rating != null) {
+          const ownT = document.createElementNS(sns, 'text')
+          ownT.setAttribute('x', '13')
+          ownT.setAttribute('y', '12')
+          ownT.setAttribute('text-anchor', 'middle')
+          ownT.setAttribute('dominant-baseline', 'central')
+          ownT.setAttribute('font-family', 'system-ui,sans-serif')
+          ownT.setAttribute('font-size', '8')
+          ownT.setAttribute('font-weight', '700')
+          ownT.setAttribute('fill', 'white')
+          ownT.setAttribute('pointer-events', 'none')
+          ownT.textContent = pin.rating % 1 === 0 ? String(pin.rating) : pin.rating.toFixed(1)
+          ownSvg.appendChild(ownT)
+        } else {
+          const ownDot = document.createElementNS(sns, 'circle')
+          ownDot.setAttribute('cx', '13')
+          ownDot.setAttribute('cy', '12')
+          ownDot.setAttribute('r', '4')
+          ownDot.setAttribute('fill', 'white')
+          ownDot.setAttribute('fill-opacity', '0.9')
+          ownDot.setAttribute('pointer-events', 'none')
+          ownSvg.appendChild(ownDot)
+        }
         const el = document.createElement('div')
         el.style.cssText = 'cursor:pointer;'
         el.appendChild(ownSvg)
@@ -586,20 +618,20 @@ export function MapPage() {
           )}
 
           {isLoading && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-surface border border-outline-variant px-4 py-2 flex items-center gap-2 font-body-base text-body-base text-secondary">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 flex items-center gap-2 font-body-base text-body-base text-secondary shadow-lg">
               <Spinner size={4} />
               Loading pins…
             </div>
           )}
           {!isLoading && (restaurantGroups?.length ?? 0) === 0 && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-surface border border-outline-variant px-4 py-2 font-body-base text-body-base text-secondary">
-              Follow some influencers on Discover to see their pins here
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 font-body-base text-body-base text-secondary shadow-lg whitespace-nowrap">
+              Follow some curators on Discover to see their pins here
             </div>
           )}
 
           {addPinMode && (
-            <div className="absolute top-16 md:top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-outline-variant px-4 py-2 flex items-center gap-3 font-body-base text-body-base text-on-surface">
-              Click a location on the map to place your pin
+            <div className="absolute top-16 md:top-4 left-1/2 -translate-x-1/2 z-20 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2.5 flex items-center gap-3 font-body-base text-body-base text-on-surface shadow-lg">
+              Tap a spot on the map
               <button
                 onClick={() => setAddPinMode(false)}
                 className="font-label-caps text-label-caps text-secondary hover:text-primary uppercase"
@@ -609,12 +641,12 @@ export function MapPage() {
             </div>
           )}
           {pickError && (
-            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-surface border border-red-300 text-red-600 px-4 py-2 font-body-base text-body-base">
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 text-red-400 font-body-base text-body-base shadow-lg">
               {pickError}
             </div>
           )}
           {successMessage && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-surface border border-primary text-primary px-4 py-2 font-body-base text-body-base">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 rounded-full bg-surface-container-low/90 backdrop-blur-sm px-5 py-2 text-primary font-body-base text-body-base shadow-lg">
               {successMessage}
             </div>
           )}
@@ -629,20 +661,25 @@ export function MapPage() {
 
           {selectedPin && pinPixelPos && !detailPanelOpen && (
             <div
-              className="absolute z-40 w-[280px] bg-surface border border-outline-variant shadow-xl"
-              style={{ left: pinPixelPos.x, top: pinPixelPos.y, transform: 'translate(-50%, calc(-100% - 36px))' }}
+              className="absolute z-40 w-[280px] rounded-2xl overflow-hidden shadow-2xl"
+              style={{
+                left: pinPixelPos.x,
+                top: pinPixelPos.y,
+                transform: 'translate(-50%, calc(-100% - 44px))',
+                background: 'rgba(28,27,27,0.95)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+              }}
             >
-              {/* Down-pointing caret */}
-              <div className="absolute -bottom-[7px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-surface border-r border-b border-outline-variant rotate-45" />
 
               {/* Cover photo */}
               {selectedPin.photos[0] && (
-                <div className="relative w-full overflow-hidden" style={{ height: 120 }}>
+                <div className="relative w-full overflow-hidden" style={{ height: 140 }}>
                   <img src={selectedPin.photos[0]} alt={selectedPin.restaurant_name} className="w-full h-full object-cover" />
                   {selectedAvgRating != null && (
-                    <div className="absolute bottom-2 left-2 bg-surface/90 px-1.5 py-0.5 flex items-center gap-1">
-                      <Icon name="star" filled className="text-[12px] text-primary" />
-                      <span className="font-label-caps text-label-caps text-on-surface">{selectedAvgRating}</span>
+                    <div className="absolute bottom-2 left-2 rounded-lg bg-black/60 backdrop-blur-sm px-2 py-0.5 flex items-center gap-1">
+                      <Icon name="star" filled className="text-[11px] text-primary" />
+                      <span className="font-label-caps text-label-caps text-white">{selectedAvgRating}</span>
                     </div>
                   )}
                 </div>
@@ -701,7 +738,7 @@ export function MapPage() {
               {selectedPin.cuisine_tags && selectedPin.cuisine_tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 px-3 pb-2">
                   {selectedPin.cuisine_tags.map((tag) => (
-                    <span key={tag} className="px-1.5 py-0.5 border border-outline-variant bg-surface-container-low font-label-caps text-[9px] text-on-surface-variant">
+                    <span key={tag} className="px-2 py-0.5 rounded-full bg-surface-container font-label-caps text-[9px] text-on-surface-variant">
                       {tag}
                     </span>
                   ))}
@@ -709,10 +746,10 @@ export function MapPage() {
               )}
 
               {/* Find out more */}
-              <div className="border-t border-outline-variant mx-3 pt-2 pb-2">
+              <div className="px-3 pb-2 pt-1">
                 <button
                   onClick={() => setDetailPanelOpen(true)}
-                  className="w-full py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary border border-primary transition-colors"
+                  className="w-full py-2 rounded-xl font-label-caps text-label-caps text-primary bg-surface-container hover:bg-primary hover:text-on-primary transition-colors"
                 >
                   Find out more →
                 </button>
@@ -720,7 +757,7 @@ export function MapPage() {
 
               {/* Delete confirmation */}
               {confirmingDeletePin && (
-                <div className="border-t border-outline-variant mx-3 pt-2 pb-2 flex items-center justify-between">
+                <div className="px-3 pb-2 flex items-center justify-between">
                   <span className="font-body-sm text-body-sm text-on-surface">Delete this pin?</span>
                   <div className="flex items-center gap-2">
                     {deletePin.isError && <span className="font-body-sm text-body-sm text-red-600">Failed.</span>}
@@ -737,14 +774,14 @@ export function MapPage() {
               )}
 
               {/* Footer actions */}
-              <div className="border-t border-outline-variant flex">
+              <div className="px-3 pb-3 flex gap-2">
                 {(() => {
                   const group = restaurantGroups?.find((g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim())
                   const count = group?.pins.filter((p) => !hiddenIds.has(p.influencer_id)).length ?? 1
                   return (
                     <button
                       onClick={() => setSpottersPanelOpen(true)}
-                      className="flex-1 py-2 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors border-r border-outline-variant text-center"
+                      className="flex-1 py-2 rounded-xl font-label-caps text-label-caps text-primary bg-surface-container hover:bg-primary hover:text-on-primary transition-colors text-center"
                     >
                       {count} {count === 1 ? 'spotter' : 'spotters'} →
                     </button>
@@ -754,7 +791,7 @@ export function MapPage() {
                   href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex-1 py-2 font-label-caps text-label-caps text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-1"
+                  className="flex-1 py-2 rounded-xl font-label-caps text-label-caps text-on-surface-variant bg-surface-container hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1"
                 >
                   <Icon name="directions" className="text-[14px]" />
                   Directions
@@ -764,163 +801,191 @@ export function MapPage() {
           )}
 
           {detailPanelOpen && selectedPin && (
-            <aside className="absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface border-l border-outline-variant z-40 flex flex-col overflow-y-auto animate-slide-in-right">
-              <div className="sticky top-0 bg-surface z-10 flex justify-between items-center p-4 border-b border-outline-variant">
-                <button onClick={() => setSelectedPin(null)} className="text-on-surface-variant hover:text-on-surface transition-colors">
-                  <Icon name="arrow_back" />
-                </button>
-                {confirmingDeletePin ? (
-                  <div className="flex items-center gap-2">
-                    {deletePin.isError && <span className="font-body-sm text-body-sm text-red-600">Failed.</span>}
-                    <button onClick={() => setConfirmingDeletePin(false)} className="font-label-caps text-label-caps text-secondary hover:text-on-surface uppercase transition-colors">Cancel</button>
-                    <button
-                      onClick={() => deletePin.mutate(selectedPin.id)}
-                      disabled={deletePin.isPending}
-                      className="px-3 py-1 bg-red-600 text-white font-label-caps text-label-caps uppercase hover:bg-red-700 transition-colors disabled:opacity-50"
-                    >
-                      {deletePin.isPending ? 'Deleting…' : 'Delete'}
-                    </button>
-                  </div>
-                ) : isOwnPin ? (
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setConfirmingDeletePin(true)} className="text-on-surface-variant hover:text-red-600 transition-colors"><Icon name="delete" /></button>
-                    <button onClick={() => setEditingPin(selectedPin)} className="text-on-surface-variant hover:text-primary transition-colors"><Icon name="edit" /></button>
-                  </div>
+            <aside className="absolute top-0 right-0 h-full w-full md:w-[400px] bg-surface z-40 flex flex-col overflow-y-auto animate-slide-in-right">
+
+              {/* Full-bleed photo hero with floating controls */}
+              <div className="relative w-full shrink-0" style={{ height: '42%', minHeight: 200 }}>
+                {selectedPin.photos[0] ? (
+                  <img
+                    src={selectedPin.photos[0]}
+                    alt={selectedPin.restaurant_name}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
+                  <div className="w-full h-full bg-surface-container flex items-center justify-center">
+                    <span className="font-display-lg text-on-surface-variant italic opacity-20" style={{ fontSize: 64 }}>
+                      {selectedPin.restaurant_name[0]}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-surface to-transparent pointer-events-none" />
+                <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 pb-6 bg-gradient-to-b from-black/50 to-transparent">
                   <button
-                    onClick={() => handleSaveToggle(selectedPin.id)}
-                    className={`transition-colors ${savedIds.has(selectedPin.id) ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                    onClick={() => setSelectedPin(null)}
+                    className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
                   >
-                    <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} />
+                    <Icon name="arrow_back" className="text-[18px]" />
                   </button>
+                  {isOwnPin ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setConfirmingDeletePin(true)}
+                        className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-red-600 transition-colors"
+                      >
+                        <Icon name="delete" className="text-[17px]" />
+                      </button>
+                      <button
+                        onClick={() => setEditingPin(selectedPin)}
+                        className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-primary transition-colors"
+                      >
+                        <Icon name="edit" className="text-[17px]" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleSaveToggle(selectedPin.id)}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                        savedIds.has(selectedPin.id)
+                          ? 'bg-primary text-on-primary'
+                          : 'bg-black/40 backdrop-blur-sm text-white hover:bg-primary'
+                      }`}
+                    >
+                      <Icon name="bookmark" filled={savedIds.has(selectedPin.id)} className="text-[18px]" />
+                    </button>
+                  )}
+                </div>
+                {selectedAvgRating != null && (
+                  <div className="absolute bottom-5 right-4 rounded-lg bg-black/60 backdrop-blur-sm px-2.5 py-1 flex items-center gap-1">
+                    <Icon name="star" filled className="text-[13px] text-primary" />
+                    <span className="font-label-caps text-label-caps text-white">{selectedAvgRating}</span>
+                  </div>
                 )}
               </div>
 
-              <div className="p-4 flex flex-col flex-1">
-                {/* Photo */}
-                <div className="w-full aspect-[4/3] border border-outline-variant mb-6 relative overflow-hidden bg-surface-container">
-                  {selectedPin.photos[0] ? (
-                    <img src={selectedPin.photos[0]} alt={selectedPin.restaurant_name} className="w-full h-full object-cover" />
-                  ) : null}
-                  {selectedAvgRating != null && (
-                    <div className="absolute bottom-3 right-3 bg-surface border border-outline-variant px-2 py-1 flex items-center gap-1">
-                      <Icon name="star" filled className="text-[14px] text-primary" />
-                      <span className="font-label-caps text-label-caps text-on-surface">{selectedAvgRating}</span>
-                    </div>
-                  )}
+              {/* Content */}
+              <div className="flex flex-col flex-1 px-5 pb-16 md:pb-6">
+                <div className="flex items-center justify-between gap-2 mb-3 pt-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedPin.vibe_tag && (
+                      <span className="rounded-full px-3 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container">{selectedPin.vibe_tag.toUpperCase()}</span>
+                    )}
+                    {(selectedPin.price_per_head || selectedPin.price_range) && (
+                      <span className="rounded-full px-3 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container">{selectedPin.price_per_head ?? selectedPin.price_range}</span>
+                    )}
+                  </div>
+                  {(() => {
+                    const group = restaurantGroups?.find((g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim())
+                    const count = group?.pins.filter((p) => !hiddenIds.has(p.influencer_id)).length ?? 1
+                    return (
+                      <button onClick={() => setSpottersPanelOpen(true)} className="shrink-0 rounded-full bg-surface-container px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors">
+                        {count} {count === 1 ? 'spotter' : 'spotters'} →
+                      </button>
+                    )
+                  })()}
                 </div>
 
-                <div className="flex flex-col flex-grow">
-                  {/* Top row: tags + spotters */}
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="flex flex-wrap gap-2">
-                      {selectedPin.vibe_tag && (
-                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">{selectedPin.vibe_tag.toUpperCase()}</span>
-                      )}
-                      {(selectedPin.price_per_head || selectedPin.price_range) && (
-                        <span className="border border-outline-variant px-2 py-1 font-label-caps text-label-caps text-on-surface-variant bg-surface-container-low">{selectedPin.price_per_head ?? selectedPin.price_range}</span>
-                      )}
-                    </div>
-                    {(() => {
-                      const group = restaurantGroups?.find((g) => g.restaurant_key === selectedPin.restaurant_name.toLowerCase().trim())
-                      const count = group?.pins.filter((p) => !hiddenIds.has(p.influencer_id)).length ?? 1
-                      return (
-                        <button onClick={() => setSpottersPanelOpen(true)} className="shrink-0 border border-primary px-3 py-1.5 font-label-caps text-label-caps text-primary hover:bg-primary hover:text-on-primary transition-colors rounded-lg">
-                          {count} {count === 1 ? 'spotter' : 'spotters'} recommended this →
-                        </button>
-                      )
-                    })()}
+                <h2 className="font-display-lg text-on-surface italic leading-tight mb-4" style={{ fontSize: 28, lineHeight: '34px' }}>
+                  {selectedPin.restaurant_name}
+                </h2>
+
+                {selectedPin.cuisine_tags && selectedPin.cuisine_tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-5">
+                    {selectedPin.cuisine_tags.map((tag) => (
+                      <span key={tag} className="px-2.5 py-1 rounded-full bg-surface-container font-label-caps text-label-caps text-on-surface-variant">{tag}</span>
+                    ))}
                   </div>
+                )}
 
-                  {/* Name */}
-                  <h2 className="font-headline-md text-headline-md text-on-surface mt-2 mb-1">{selectedPin.restaurant_name}</h2>
-
-                  {/* Cuisine tags */}
-                  {selectedPin.cuisine_tags && selectedPin.cuisine_tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {selectedPin.cuisine_tags.map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 bg-surface-container font-label-caps text-label-caps text-on-surface-variant border border-outline-variant">{tag}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Would return / best time / best for */}
-                  {(selectedPin.would_return || selectedPin.best_time || selectedPin.best_for?.length) && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {selectedPin.would_return && (
-                        <span className="font-label-caps text-label-caps text-secondary">Would return: <span className="text-on-surface">{selectedPin.would_return}</span></span>
-                      )}
-                      {selectedPin.best_time && (
-                        <span className="font-label-caps text-label-caps text-secondary">· Best time: <span className="text-on-surface">{selectedPin.best_time.split(' (')[0]}</span></span>
-                      )}
-                      {selectedPin.best_for && selectedPin.best_for.length > 0 && (
-                        <span className="font-label-caps text-label-caps text-secondary w-full">Best for: <span className="text-on-surface">{selectedPin.best_for.join(', ')}</span></span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Reasoning */}
-                  {selectedPin.reasoning && selectedPin.reasoning.length > 0 && (
-                    <div className="flex flex-col gap-1 mb-4 border-t border-outline-variant pt-4 mt-1">
-                      {selectedPin.reasoning.map((r) => (
-                        <div key={r} className="flex items-center gap-2">
-                          <Icon name="star" filled className="text-[13px] text-primary shrink-0" />
-                          <span className="font-body-sm text-body-sm text-on-surface">{r}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Must-order dishes */}
-                  {(() => {
-                    const dishes = selectedPin.must_order_dishes?.filter(Boolean)
-                    const legacy = selectedPin.must_order
-                    if (dishes && dishes.length > 0) return (
-                      <div className="border-t border-outline-variant pt-4 mb-4 mt-1">
-                        <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-2">MUST ORDER</h3>
-                        <ol className="flex flex-col gap-1">
-                          {dishes.map((d, i) => (
-                            <li key={i} className="flex items-center gap-2">
-                              <span className="font-label-caps text-label-caps text-primary">{i + 1}.</span>
-                              <span className="font-headline-sm text-headline-sm text-on-surface">{d}</span>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    )
-                    if (legacy) return (
-                      <div className="border-t border-outline-variant pt-4 mb-4 mt-1">
-                        <h3 className="font-label-caps text-label-caps text-on-surface-variant mb-2">MUST ORDER</h3>
-                        <p className="font-headline-sm text-headline-sm text-primary">{legacy}</p>
-                      </div>
-                    )
-                    return null
-                  })()}
-
-                  {/* Note */}
-                  {selectedPin.note && (
-                    <p className="font-body-base text-body-base text-on-surface leading-relaxed border-t border-outline-variant pt-4 mt-1 mb-3">"{selectedPin.note}"</p>
-                  )}
-
-                  {/* Insider tip */}
-                  {selectedPin.insider_tip && (
-                    <div className="bg-surface-container-low border border-outline-variant px-3 py-3 mb-4">
-                      <p className="font-label-caps text-label-caps text-secondary mb-1">INSIDER TIP</p>
-                      <p className="font-body-sm text-body-sm text-on-surface italic leading-relaxed">{selectedPin.insider_tip}</p>
-                    </div>
-                  )}
-
-                  <div className="mt-auto pt-4 pb-16 md:pb-0 border-t border-outline-variant">
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full py-3 bg-[#1A1A1A] text-white font-label-caps text-label-caps tracking-wider hover:bg-[#333333] transition-colors border border-[#1A1A1A] flex items-center justify-center gap-2"
-                    >
-                      <Icon name="directions" className="text-[18px]" />
-                      GET DIRECTIONS
-                    </a>
+                {(selectedPin.would_return || selectedPin.best_time || selectedPin.best_for?.length) && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mb-5">
+                    {selectedPin.would_return && (
+                      <span className="font-label-caps text-label-caps text-secondary">Would return: <span className="text-on-surface">{selectedPin.would_return}</span></span>
+                    )}
+                    {selectedPin.best_time && (
+                      <span className="font-label-caps text-label-caps text-secondary">Best time: <span className="text-on-surface">{selectedPin.best_time.split(' (')[0]}</span></span>
+                    )}
+                    {selectedPin.best_for && selectedPin.best_for.length > 0 && (
+                      <span className="font-label-caps text-label-caps text-secondary w-full">Best for: <span className="text-on-surface">{selectedPin.best_for.join(', ')}</span></span>
+                    )}
                   </div>
+                )}
+
+                {selectedPin.reasoning && selectedPin.reasoning.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-5">
+                    {selectedPin.reasoning.map((r) => (
+                      <div key={r} className="flex items-start gap-2.5 rounded-xl bg-surface-container-low px-3.5 py-2.5">
+                        <Icon name="star" filled className="text-[11px] text-primary mt-0.5 shrink-0" />
+                        <span className="font-body-sm text-body-sm text-on-surface">{r}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(() => {
+                  const dishes = selectedPin.must_order_dishes?.filter(Boolean)
+                  const legacy = selectedPin.must_order
+                  if (dishes && dishes.length > 0) return (
+                    <div className="mb-5">
+                      <p className="font-label-caps text-label-caps text-secondary uppercase tracking-wider mb-3">Must order</p>
+                      <ol className="flex flex-col gap-2">
+                        {dishes.map((d, i) => (
+                          <li key={i} className="flex items-center gap-3 rounded-xl bg-surface-container-low px-4 py-2.5">
+                            <span className="font-label-caps text-label-caps text-primary shrink-0">{i + 1}</span>
+                            <span className="font-headline-sm text-headline-sm text-on-surface">{d}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )
+                  if (legacy) return (
+                    <div className="mb-5">
+                      <p className="font-label-caps text-label-caps text-secondary uppercase tracking-wider mb-2">Must order</p>
+                      <p className="font-headline-sm text-headline-sm text-primary">{legacy}</p>
+                    </div>
+                  )
+                  return null
+                })()}
+
+                {selectedPin.note && (
+                  <div className="mb-5 pl-4 border-l-2 border-primary/40">
+                    <p className="font-body-base text-body-base text-on-surface leading-relaxed italic">"{selectedPin.note}"</p>
+                  </div>
+                )}
+
+                {selectedPin.insider_tip && (
+                  <div className="bg-surface-container-low rounded-xl px-4 py-3 mb-5">
+                    <p className="font-label-caps text-label-caps text-secondary mb-1">INSIDER TIP</p>
+                    <p className="font-body-sm text-body-sm text-on-surface italic leading-relaxed">{selectedPin.insider_tip}</p>
+                  </div>
+                )}
+
+                {confirmingDeletePin && (
+                  <div className="rounded-xl bg-red-950/30 px-4 py-3 mb-5 flex flex-col gap-2">
+                    <p className="font-body-sm text-body-sm text-on-surface">Delete this pin? This cannot be undone.</p>
+                    <div className="flex items-center gap-2">
+                      {deletePin.isError && <span className="font-body-sm text-body-sm text-red-400">Failed.</span>}
+                      <button onClick={() => setConfirmingDeletePin(false)} className="font-label-caps text-label-caps text-secondary hover:text-on-surface uppercase tracking-wider transition-colors">Cancel</button>
+                      <button
+                        onClick={() => deletePin.mutate(selectedPin.id)}
+                        disabled={deletePin.isPending}
+                        className="rounded-full px-3 py-1.5 bg-red-600 text-white font-label-caps text-label-caps uppercase hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {deletePin.isPending ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-auto pt-4">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${selectedPin.lat},${selectedPin.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-3 rounded-xl bg-primary text-on-primary font-label-caps text-label-caps tracking-wider hover:bg-primary-container transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Icon name="directions" className="text-[18px]" />
+                    GET DIRECTIONS
+                  </a>
                 </div>
               </div>
             </aside>
@@ -968,7 +1033,7 @@ export function MapPage() {
                           </span>
                         </div>
                         {rating != null && (
-                          <div className="shrink-0 ml-4 flex items-center gap-1 border border-outline-variant px-2 py-1">
+                          <div className="shrink-0 ml-4 flex items-center gap-1 rounded-lg bg-surface-container px-2 py-1">
                             <Icon name="star" filled className="text-[14px] text-primary" />
                             <span className="font-label-caps text-label-caps text-on-surface">{rating}</span>
                           </div>
