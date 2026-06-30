@@ -107,6 +107,13 @@ export function InfluencerPage() {
       fadeDuration: 0,
     })
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
+    map.current.on('style.load', () => {
+      map.current?.setConfigProperty('basemap', 'lightPreset', 'night')
+      map.current?.setConfigProperty('basemap', 'show3dObjects', false)
+      map.current?.setConfigProperty('basemap', 'colorMotorways', '#42566e')
+      map.current?.setConfigProperty('basemap', 'colorTrunks', '#42566e')
+      map.current?.setConfigProperty('basemap', 'colorRoads', '#42566e')
+    })
     return () => {
       map.current?.remove()
       map.current = null
