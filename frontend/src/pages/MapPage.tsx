@@ -277,11 +277,11 @@ export function MapPage() {
               t.setAttribute('text-anchor', 'middle')
               t.setAttribute('dominant-baseline', 'central')
               t.setAttribute('font-family', 'system-ui,sans-serif')
-              t.setAttribute('font-size', '9')
+              t.setAttribute('font-size', '7')
               t.setAttribute('font-weight', '700')
               t.setAttribute('fill', 'white')
               t.setAttribute('pointer-events', 'none')
-              t.textContent = formatRating(avgRating)
+              t.textContent = '★' + formatRating(avgRating)
               svg.appendChild(t)
             }
           } else {
@@ -292,11 +292,11 @@ export function MapPage() {
               t.setAttribute('text-anchor', 'middle')
               t.setAttribute('dominant-baseline', 'central')
               t.setAttribute('font-family', 'system-ui,sans-serif')
-              t.setAttribute('font-size', '7')
+              t.setAttribute('font-size', '6')
               t.setAttribute('font-weight', '700')
               t.setAttribute('fill', 'white')
               t.setAttribute('pointer-events', 'none')
-              t.textContent = formatRating(primary.rating)
+              t.textContent = '★' + formatRating(primary.rating)
               svg.appendChild(t)
             } else {
               const dot = document.createElementNS(ns, 'circle')

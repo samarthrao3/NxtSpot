@@ -19,6 +19,14 @@ class PinWithInfluencer(BaseModel):
     note: str | None
     rating: float | None
     created_at: datetime
+    price_per_head: str | None
+    cuisine_tags: list[str] | None
+    reasoning: list[str] | None
+    must_order_dishes: list[str] | None
+    insider_tip: str | None
+    would_return: str | None
+    best_time: str | None
+    best_for: list[str] | None
 
 
 class RestaurantGroup(BaseModel):
