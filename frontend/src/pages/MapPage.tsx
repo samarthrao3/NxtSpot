@@ -70,8 +70,8 @@ export function MapPage() {
       setPinPixelPos({ x, y })
     }
     update()
-    map.current?.on('move', update)
-    return () => { map.current?.off('move', update) }
+    map.current?.on('moveend', update)
+    return () => { map.current?.off('moveend', update) }
   }, [selectedPin, mapReady])
 
   useEffect(() => {
@@ -198,7 +198,7 @@ export function MapPage() {
   // Initialise map
   useEffect(() => {
     if (map.current || !mapContainer.current) return
-    map.current = new mapboxgl.Map({
+    const mapOpts: mapboxgl.MapboxOptions & { pixelRatio?: number } = {
       container: mapContainer.current,
       style: MAP_STYLE,
       center: BANGALORE_CENTER,
@@ -208,7 +208,9 @@ export function MapPage() {
       dragRotate: false,
       touchPitch: false,
       fadeDuration: 0,
-    })
+      pixelRatio: Math.min(window.devicePixelRatio, 2),
+    }
+    map.current = new mapboxgl.Map(mapOpts)
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.current.on('style.load', () => {
       map.current?.setConfigProperty('basemap', 'lightPreset', 'night')
@@ -270,8 +272,8 @@ export function MapPage() {
           svg.setAttribute('height', String(pinH))
           svg.setAttribute('viewBox', `0 0 ${pinW} ${pinH}`)
           svg.style.cssText = isMulti
-            ? 'display:block;filter:drop-shadow(0 2px 10px rgba(255,193,116,0.45));'
-            : `display:block;filter:drop-shadow(0 2px 10px ${pinGlow});`
+            ? 'display:block;filter:drop-shadow(0 1px 5px rgba(255,193,116,0.4));'
+            : `display:block;filter:drop-shadow(0 1px 5px ${pinGlow});`
           const pathEl = document.createElementNS(ns, 'path')
           pathEl.setAttribute('d', isMulti
             ? 'M16,2 C8.27,2 2,8.27 2,16 C2,26.75 16,42 16,42 C16,42 30,26.75 30,16 C30,8.27 23.73,2 16,2 Z'
@@ -404,7 +406,7 @@ export function MapPage() {
         ownSvg.setAttribute('width', '26')
         ownSvg.setAttribute('height', '34')
         ownSvg.setAttribute('viewBox', '0 0 26 34')
-        ownSvg.style.cssText = `display:block;filter:drop-shadow(0 2px 10px ${ownGlow});`
+        ownSvg.style.cssText = `display:block;filter:drop-shadow(0 1px 5px ${ownGlow});`
         const ownPath = document.createElementNS(sns, 'path')
         ownPath.setAttribute('d', 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
         ownPath.setAttribute('fill', ownColor)
@@ -674,7 +676,7 @@ export function MapPage() {
             </div>
           )}
 
-          {selectedPin && pinPixelPos && !detailPanelOpen && (
+          {selectedPin && pinPixelPos && !detailPanelOpen && !mapMoving && (
             <div
               className="absolute z-40 w-[280px] rounded-2xl overflow-hidden shadow-2xl"
               style={{
@@ -682,8 +684,8 @@ export function MapPage() {
                 top: pinPixelPos.y,
                 transform: 'translate(-50%, calc(-100% - 44px))',
                 background: 'rgba(28,27,27,0.95)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
               }}
             >
 
