@@ -6,10 +6,12 @@ import { SavedPage } from '@/pages/SavedPage'
 import { FollowingPage } from '@/pages/FollowingPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { ProtectedRoute } from '@/components/ui/ProtectedRoute'
+import { InstallBanner } from '@/components/ui/InstallBanner'
 
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <InstallBanner />
       <Routes>
         <Route path="/" element={<Navigate to="/explore" replace />} />
         <Route path="/explore" element={<ExplorePage />} />
