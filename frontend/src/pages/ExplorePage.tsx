@@ -34,6 +34,21 @@ export function ExplorePage() {
   const [activeCategory, setActiveCategory] = useState<Category>('All')
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set())
 
+  // On mobile the browser back button should close the open curator panel
+  // rather than navigating away from Discover.
+  const panelOpen = !!selectedInfluencer
+  useEffect(() => {
+    if (!panelOpen) return
+    window.history.pushState({ panel: true }, '')
+    const handlePop = () => setSelectedInfluencer(null)
+    window.addEventListener('popstate', handlePop)
+    return () => {
+      window.removeEventListener('popstate', handlePop)
+      // Panel closed by an in-app button — consume the history entry we pushed.
+      if (window.history.state?.panel) window.history.back()
+    }
+  }, [panelOpen])
+
   const PAGE_SIZE = 12
   const MIN_VISIBLE = 6
 

@@ -3,11 +3,15 @@ import { Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
+import { Icon as LucideIcon } from 'lucide-react'
 import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_MAX_BOUNDS, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
-import { feedApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin } from '@/lib/api'
+import { feedApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin, type PinSearchResult } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { useCurrentUser } from '@/lib/useCurrentUser'
 import { colorForId } from '@/lib/colors'
+import { CATEGORIES, categoryStyle } from '@/lib/categories'
+import { createPinMarkerElement } from '@/lib/markers'
+import { CategoryBadge } from '@/components/pins/CategoryBadge'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { SideNavBar } from '@/components/ui/SideNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
@@ -16,6 +20,16 @@ import { Icon } from '@/components/ui/Icon'
 import { PinFormModal } from '@/components/pins/PinFormModal'
 
 mapboxgl.accessToken = MAPBOX_TOKEN
+
+// Small switch used throughout the side-nav filter groups.
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <label className="relative inline-flex items-center cursor-pointer shrink-0" onClick={(e) => e.stopPropagation()}>
+      <input type="checkbox" className="sr-only peer" checked={checked} onChange={onChange} />
+      <div className="w-7 h-4 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary border border-outline-variant" />
+    </label>
+  )
+}
 
 export function MapPage() {
   const qc = useQueryClient()
@@ -30,7 +44,12 @@ export function MapPage() {
   const [mapMoving, setMapMoving] = useState(false)
   const [sideNavOpen, setSideNavOpen] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set())
+  const [curatorsExpanded, setCuratorsExpanded] = useState(true)
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false)
   const [addPinMode, setAddPinMode] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
   const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number; name?: string } | null>(null)
   const [pickError, setPickError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -171,6 +190,39 @@ export function MapPage() {
     },
   })
 
+  // Pin search — scoped to followed Spotters by the backend. Fires on submit.
+  const isSearching = submittedQuery.trim().length > 0
+  const { data: searchData, isFetching: searchFetching } = useQuery({
+    queryKey: ['pin-search', submittedQuery],
+    queryFn: async () => {
+      const token = await getAppToken()
+      return pinsApi.search(submittedQuery, token)
+    },
+    enabled: isSearching,
+    placeholderData: (prev) => prev,
+  })
+  const searchResults = isSearching ? searchData : undefined
+  // Set of pin ids that survive the search filter — null means "no filter, show everything".
+  const matchedPinIds = useMemo(
+    () => (searchResults ? new Set(searchResults.map((p) => p.id)) : null),
+    [searchResults],
+  )
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = searchInput.trim()
+    if (!q) { clearSearch(); return }
+    setSubmittedQuery(q)
+  }
+  const clearSearch = () => {
+    setSearchInput('')
+    setSubmittedQuery('')
+  }
+  const handleResultClick = (pin: PinSearchResult) => {
+    map.current?.flyTo({ center: [pin.lng, pin.lat], zoom: 16, duration: 1000 })
+    setSelectedPin(pin)
+  }
+
   const spotterInfluencers = useMemo(() => {
     if (!selectedPin || !restaurantGroups) return []
     const key = selectedPin.restaurant_name.toLowerCase().trim()
@@ -238,7 +290,19 @@ export function MapPage() {
     setSelectedPin(focusPin)
   }, [mapReady, focusPin])
 
-  // Drop markers when restaurant groups or visibility change
+  // Re-frame the map to the search results so the geographic response is visible.
+  useEffect(() => {
+    if (!mapReady || !map.current || !searchResults || searchResults.length === 0) return
+    const bounds = new mapboxgl.LngLatBounds()
+    searchResults.forEach((p) => bounds.extend([p.lng, p.lat]))
+    map.current.fitBounds(bounds, {
+      padding: { top: 170, bottom: 100, left: 60, right: 60 },
+      maxZoom: 15,
+      duration: 900,
+    })
+  }, [searchResults, mapReady])
+
+  // Drop markers when restaurant groups, visibility, or the search filter change
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!map.current || !mapReady) return
@@ -247,94 +311,28 @@ export function MapPage() {
       popups.current.forEach((p) => p.remove())
       popups.current = []
 
+      // While searching, only pins in the result set stay on the map.
+      const passesSearch = (p: Pin) => !matchedPinIds || matchedPinIds.has(p.id)
+      const passesCategory = (p: Pin) => !p.category || !hiddenCategories.has(p.category)
+      const isVisible = (p: Pin) => !hiddenIds.has(p.influencer_id) && passesSearch(p) && passesCategory(p)
+
       // One marker per restaurant group — position is the group's canonical lat/lng
       // (backend sets this to the first pin received for that restaurant key).
       restaurantGroups
-        ?.filter((group) => group.pins.some((p) => !hiddenIds.has(p.influencer_id)))
+        ?.filter((group) => group.pins.some(isVisible))
         .forEach((group) => {
-          const visiblePins = group.pins.filter((p) => !hiddenIds.has(p.influencer_id))
+          const visiblePins = group.pins.filter(isVisible)
           const count = visiblePins.length
           const primary = visiblePins[0]
           const isMulti = count > 1
-          // Single: solid influencer color + colored glow (lantern on dark map). Multi: solid amber + amber glow.
-          const AMBER = '#ffc174'
-          const AMBER_DARK = '#472a00'
-          const pinColor = colorForId(primary.influencer_id)
-          const pr = parseInt(pinColor.slice(1, 3), 16)
-          const pg = parseInt(pinColor.slice(3, 5), 16)
-          const pb = parseInt(pinColor.slice(5, 7), 16)
-          const pinGlow = `rgba(${pr},${pg},${pb},0.55)`
-          const pinW = isMulti ? 32 : 26
-          const pinH = isMulti ? 42 : 34
-          const ns = 'http://www.w3.org/2000/svg'
-          const svg = document.createElementNS(ns, 'svg')
-          svg.setAttribute('width', String(pinW))
-          svg.setAttribute('height', String(pinH))
-          svg.setAttribute('viewBox', `0 0 ${pinW} ${pinH}`)
-          svg.style.cssText = isMulti
-            ? 'display:block;filter:drop-shadow(0 1px 5px rgba(255,193,116,0.4));'
-            : `display:block;filter:drop-shadow(0 1px 5px ${pinGlow});`
-          const pathEl = document.createElementNS(ns, 'path')
-          pathEl.setAttribute('d', isMulti
-            ? 'M16,2 C8.27,2 2,8.27 2,16 C2,26.75 16,42 16,42 C16,42 30,26.75 30,16 C30,8.27 23.73,2 16,2 Z'
-            : 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
-          if (isMulti) {
-            pathEl.setAttribute('fill', AMBER)
-            pathEl.setAttribute('stroke', AMBER_DARK)
-            pathEl.setAttribute('stroke-width', '1.5')
-          } else {
-            pathEl.setAttribute('fill', pinColor)
-            pathEl.setAttribute('stroke', 'rgba(255,255,255,0.7)')
-            pathEl.setAttribute('stroke-width', '1.5')
-          }
-          svg.appendChild(pathEl)
+          // Pill marker: capsule = influencer colour (amber for multi-curator spots),
+          // category icon on the left, rating (group average) on the right.
+          const ringColor = isMulti ? '#ffc174' : colorForId(primary.influencer_id)
           const ratedPins = visiblePins.filter((p) => p.rating != null)
-          const avgRating = ratedPins.length > 0
-            ? ratedPins.reduce((sum, p) => sum + p.rating!, 0) / ratedPins.length
+          const avgRating = ratedPins.length
+            ? ratedPins.reduce((sum, p) => sum + (p.rating as number), 0) / ratedPins.length
             : null
-          const formatRating = (r: number) => r % 1 === 0 ? String(r) : r.toFixed(1)
-
-          if (isMulti) {
-            const t = document.createElementNS(ns, 'text')
-            t.setAttribute('x', '16')
-            t.setAttribute('y', '16')
-            t.setAttribute('text-anchor', 'middle')
-            t.setAttribute('dominant-baseline', 'central')
-            t.setAttribute('font-family', 'system-ui,sans-serif')
-            t.setAttribute('font-size', '8.5')
-            t.setAttribute('font-weight', '700')
-            t.setAttribute('fill', AMBER_DARK)
-            t.setAttribute('pointer-events', 'none')
-            t.textContent = avgRating != null ? '★' + formatRating(avgRating) : '★'
-            svg.appendChild(t)
-          } else {
-            if (primary.rating != null) {
-              const t = document.createElementNS(ns, 'text')
-              t.setAttribute('x', '13')
-              t.setAttribute('y', '12')
-              t.setAttribute('text-anchor', 'middle')
-              t.setAttribute('dominant-baseline', 'central')
-              t.setAttribute('font-family', 'system-ui,sans-serif')
-              t.setAttribute('font-size', '8')
-              t.setAttribute('font-weight', '700')
-              t.setAttribute('fill', 'white')
-              t.setAttribute('pointer-events', 'none')
-              t.textContent = formatRating(primary.rating)
-              svg.appendChild(t)
-            } else {
-              const dot = document.createElementNS(ns, 'circle')
-              dot.setAttribute('cx', '13')
-              dot.setAttribute('cy', '12')
-              dot.setAttribute('r', '4')
-              dot.setAttribute('fill', 'white')
-              dot.setAttribute('fill-opacity', '0.9')
-              dot.setAttribute('pointer-events', 'none')
-              svg.appendChild(dot)
-            }
-          }
-          const el = document.createElement('div')
-          el.style.cssText = 'cursor:pointer;'
-          el.appendChild(svg)
+          const el = createPinMarkerElement({ ringColor, category: primary.category, rating: avgRating })
 
           // Desktop-only hover popup: restaurant name + spotter count, no images
           const hoverBody = document.createElement('div')
@@ -353,7 +351,7 @@ export function MapPage() {
           const hoverPopup = new mapboxgl.Popup({
             closeButton: false,
             closeOnClick: false,
-            offset: [0, -pinH] as [number, number],
+            offset: [0, -29] as [number, number],
             maxWidth: '200px',
           }).setDOMContent(hoverBody)
           popups.current.push(hoverPopup)
@@ -393,52 +391,11 @@ export function MapPage() {
           markers.current.push(marker)
         })
 
-      // Influencer's own pins — not in the feed (self-follow is blocked by the backend)
+      // Influencer's own pins — not in the feed (self-follow is blocked by the backend).
+      // Search is scoped to followed Spotters, so own pins never match — hide them.
       ownPins?.forEach((pin) => {
-        if (hiddenIds.has(pin.influencer_id)) return
-        const ownColor = colorForId(pin.influencer_id)
-        const or = parseInt(ownColor.slice(1, 3), 16)
-        const og = parseInt(ownColor.slice(3, 5), 16)
-        const ob = parseInt(ownColor.slice(5, 7), 16)
-        const ownGlow = `rgba(${or},${og},${ob},0.55)`
-        const sns = 'http://www.w3.org/2000/svg'
-        const ownSvg = document.createElementNS(sns, 'svg')
-        ownSvg.setAttribute('width', '26')
-        ownSvg.setAttribute('height', '34')
-        ownSvg.setAttribute('viewBox', '0 0 26 34')
-        ownSvg.style.cssText = `display:block;filter:drop-shadow(0 1px 5px ${ownGlow});`
-        const ownPath = document.createElementNS(sns, 'path')
-        ownPath.setAttribute('d', 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
-        ownPath.setAttribute('fill', ownColor)
-        ownPath.setAttribute('stroke', 'rgba(255,255,255,0.7)')
-        ownPath.setAttribute('stroke-width', '1.5')
-        ownSvg.appendChild(ownPath)
-        if (pin.rating != null) {
-          const ownT = document.createElementNS(sns, 'text')
-          ownT.setAttribute('x', '13')
-          ownT.setAttribute('y', '12')
-          ownT.setAttribute('text-anchor', 'middle')
-          ownT.setAttribute('dominant-baseline', 'central')
-          ownT.setAttribute('font-family', 'system-ui,sans-serif')
-          ownT.setAttribute('font-size', '8')
-          ownT.setAttribute('font-weight', '700')
-          ownT.setAttribute('fill', 'white')
-          ownT.setAttribute('pointer-events', 'none')
-          ownT.textContent = pin.rating % 1 === 0 ? String(pin.rating) : pin.rating.toFixed(1)
-          ownSvg.appendChild(ownT)
-        } else {
-          const ownDot = document.createElementNS(sns, 'circle')
-          ownDot.setAttribute('cx', '13')
-          ownDot.setAttribute('cy', '12')
-          ownDot.setAttribute('r', '4')
-          ownDot.setAttribute('fill', 'white')
-          ownDot.setAttribute('fill-opacity', '0.9')
-          ownDot.setAttribute('pointer-events', 'none')
-          ownSvg.appendChild(ownDot)
-        }
-        const el = document.createElement('div')
-        el.style.cssText = 'cursor:pointer;'
-        el.appendChild(ownSvg)
+        if (!isVisible(pin)) return
+        const el = createPinMarkerElement({ ringColor: colorForId(pin.influencer_id), category: pin.category, rating: pin.rating })
         el.addEventListener('click', () => setSelectedPin(pin))
         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
           .setLngLat([pin.lng, pin.lat])
@@ -447,7 +404,7 @@ export function MapPage() {
       })
     }, 100)
     return () => clearTimeout(timer)
-  }, [restaurantGroups, ownPins, hiddenIds, mapReady])
+  }, [restaurantGroups, ownPins, hiddenIds, hiddenCategories, mapReady, matchedPinIds])
 
   const tryPlaceLocation = (lat: number, lng: number, name?: string) => {
     if (
@@ -501,6 +458,20 @@ export function MapPage() {
     }
   }
 
+  const toggleCategory = (cat: string) => {
+    setHiddenCategories((prev) => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat)
+      else next.add(cat)
+      return next
+    })
+  }
+
+  const allCategoriesVisible = CATEGORIES.every((c) => !hiddenCategories.has(c))
+  const toggleAllCategories = () => {
+    setHiddenCategories(allCategoriesVisible ? new Set<string>(CATEGORIES) : new Set())
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] bg-background overflow-hidden">
       <TopNavBar />
@@ -517,6 +488,7 @@ export function MapPage() {
               : undefined
           }
         >
+          {/* My Pins — influencer's own pins (unchanged) */}
           {currentUser?.role === 'influencer' && (
             <>
               <div className="px-4 py-3 font-label-caps text-label-caps text-secondary uppercase">My Pins</div>
@@ -533,45 +505,32 @@ export function MapPage() {
                     @{currentUser.handle}
                   </span>
                 </div>
-                <label
-                  className="relative inline-flex items-center cursor-pointer shrink-0"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={!hiddenIds.has(currentUser.id)}
-                    onChange={() => toggleVisible(currentUser.id)}
-                  />
-                  <div className="w-7 h-4 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary border border-outline-variant" />
-                </label>
+                <Toggle checked={!hiddenIds.has(currentUser.id)} onChange={() => toggleVisible(currentUser.id)} />
               </div>
             </>
           )}
 
-          <div className="flex items-center justify-between px-4 py-3">
-            <span className="font-label-caps text-label-caps text-secondary uppercase">Followed Curators</span>
+          {/* Followed Curators — collapsible group */}
+          <div
+            className="flex items-center justify-between px-4 py-3 border-b border-outline-variant hover:bg-surface-container-low cursor-pointer select-none"
+            onClick={() => setCuratorsExpanded((v) => !v)}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Icon name="expand_more" className={`text-[18px] text-secondary transition-transform ${curatorsExpanded ? '' : '-rotate-90'}`} />
+              <span className="font-label-caps text-label-caps text-secondary uppercase">Followed Curators</span>
+            </div>
             {followedInfluencers.length > 0 && (
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={allVisible}
-                  onChange={toggleAll}
-                />
-                <div className="w-7 h-4 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary border border-outline-variant" />
-              </label>
+              <Toggle checked={allVisible} onChange={toggleAll} />
             )}
           </div>
-          <div className="flex flex-col flex-1 overflow-y-auto">
-            {followedInfluencers.length === 0 && (
-              <p className="px-4 py-2 font-body-sm text-body-sm text-secondary">
-                Follow influencers on Discover to see their pins here.
-              </p>
-            )}
-            {followedInfluencers.map((inf) => {
-              const visible = !hiddenIds.has(inf.id)
-              return (
+          {curatorsExpanded && (
+            <div className="flex flex-col">
+              {followedInfluencers.length === 0 && (
+                <p className="px-4 py-2 font-body-sm text-body-sm text-secondary">
+                  Follow curators on Discover to see their pins here.
+                </p>
+              )}
+              {followedInfluencers.map((inf) => (
                 <div
                   key={inf.id}
                   className="flex items-center justify-between px-4 py-3 border-b border-outline-variant hover:bg-surface-container-low cursor-pointer"
@@ -586,26 +545,142 @@ export function MapPage() {
                       @{inf.handle}
                     </span>
                   </div>
-                  <label
-                    className="relative inline-flex items-center cursor-pointer shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={visible}
-                      onChange={() => toggleVisible(inf.id)}
-                    />
-                    <div className="w-7 h-4 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary border border-outline-variant" />
-                  </label>
+                  <Toggle checked={!hiddenIds.has(inf.id)} onChange={() => toggleVisible(inf.id)} />
                 </div>
-              )
-            })}
+              ))}
+            </div>
+          )}
+
+          {/* Category — collapsible group; filter pins by kind of place */}
+          <div
+            className="flex items-center justify-between px-4 py-3 border-b border-outline-variant hover:bg-surface-container-low cursor-pointer select-none"
+            onClick={() => setCategoriesExpanded((v) => !v)}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Icon name="expand_more" className={`text-[18px] text-secondary transition-transform ${categoriesExpanded ? '' : '-rotate-90'}`} />
+              <span className="font-label-caps text-label-caps text-secondary uppercase">Category</span>
+            </div>
+            <Toggle checked={allCategoriesVisible} onChange={toggleAllCategories} />
           </div>
+          {categoriesExpanded && (
+            <div className="flex flex-col">
+              {CATEGORIES.map((c) => {
+                const { label, color, iconNode } = categoryStyle(c)
+                return (
+                  <div
+                    key={c}
+                    className="flex items-center justify-between px-4 py-3 border-b border-outline-variant hover:bg-surface-container-low cursor-pointer"
+                    onClick={() => toggleCategory(c)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <LucideIcon iconNode={iconNode} size={16} style={{ color }} className="shrink-0" />
+                      <span className="font-body-base text-body-base text-on-surface truncate">
+                        {label}
+                      </span>
+                    </div>
+                    <Toggle checked={!hiddenCategories.has(c)} onChange={() => toggleCategory(c)} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </SideNavBar>
 
         <main className="flex-1 w-full relative">
           <div ref={mapContainer} className="absolute inset-0" />
+
+          {/* Persistent pin search — hidden while picking an add-pin location */}
+          {!addPinMode && (
+            <div className="absolute top-3 left-16 right-3 md:right-auto md:w-[400px] z-30 flex flex-col gap-2">
+              <form
+                onSubmit={handleSearchSubmit}
+                className="flex items-center gap-2 rounded-full bg-surface-container-low/95 backdrop-blur-sm border border-outline-variant shadow-lg pl-4 pr-1.5 py-1.5 transition-colors focus-within:border-primary"
+              >
+                <Icon name="search" className="text-on-surface-variant text-[18px] shrink-0" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  enterKeyHint="search"
+                  placeholder="Search spots, cuisines, curators…"
+                  className="flex-1 min-w-0 bg-transparent font-body-base text-body-base text-on-surface placeholder:text-secondary focus:outline-none"
+                />
+                {(searchInput || isSearching) && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="shrink-0 text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label="Clear search"
+                  >
+                    <Icon name="close" className="text-[18px]" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-full bg-primary text-on-primary w-8 h-8 flex items-center justify-center hover:bg-primary-container transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-surface-container-low"
+                  aria-label="Search"
+                >
+                  <Icon name="arrow_forward" className="text-[18px]" />
+                </button>
+              </form>
+
+              {isSearching && (
+                <div className="rounded-2xl bg-surface-container-low/95 backdrop-blur-sm border border-outline-variant shadow-lg overflow-hidden flex flex-col max-h-[calc(100dvh-16rem)] md:max-h-[70vh]">
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant shrink-0">
+                    <span className="font-label-caps text-label-caps text-secondary uppercase">
+                      {searchFetching && !searchResults
+                        ? 'Searching…'
+                        : `${searchResults?.length ?? 0} result${(searchResults?.length ?? 0) === 1 ? '' : 's'}`}
+                    </span>
+                    {searchFetching && <Spinner size={4} />}
+                  </div>
+                  <div className="overflow-y-auto">
+                    {searchResults && searchResults.length === 0 && !searchFetching && (
+                      <p className="px-4 py-6 font-body-sm text-body-sm text-secondary text-center">
+                        No spots found among the Spotters you follow.
+                      </p>
+                    )}
+                    {searchResults?.map((pin) => {
+                      const cat = categoryStyle(pin.category)
+                      return (
+                        <button
+                          key={pin.id}
+                          onClick={() => handleResultClick(pin)}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-container focus:outline-none focus-visible:bg-surface-container transition-colors border-b border-outline-variant last:border-0"
+                        >
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container shrink-0 flex items-center justify-center">
+                            {pin.photos[0] ? (
+                              <img src={pin.photos[0]} alt={pin.restaurant_name} className="w-full h-full object-cover" />
+                            ) : (
+                              <LucideIcon iconNode={cat.iconNode} size={22} style={{ color: cat.color }} />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-headline-sm text-headline-sm text-on-surface leading-tight">
+                              {pin.restaurant_name}
+                            </p>
+                            <p className="truncate font-body-sm text-body-sm text-secondary">
+                              {[pin.category ? cat.label : null, pin.influencer_handle ? `@${pin.influencer_handle}` : pin.influencer_name]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          </div>
+                          {pin.rating != null && (
+                            <div className="shrink-0 flex items-center gap-1 rounded-lg bg-surface-container px-2 py-1">
+                              <Icon name="star" filled className="text-[12px] text-primary" />
+                              <span className="font-label-caps text-label-caps text-on-surface">
+                                {pin.rating % 1 === 0 ? pin.rating : pin.rating.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {addPinMode && mapReady && map.current && (
             <div className="absolute top-4 left-16 z-30 w-72">
@@ -730,6 +805,13 @@ export function MapPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Category */}
+              {selectedPin.category && (
+                <div className="px-3 pb-1.5">
+                  <CategoryBadge category={selectedPin.category} />
+                </div>
+              )}
 
               {/* Meta row */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 pb-2">
@@ -901,9 +983,15 @@ export function MapPage() {
                   })()}
                 </div>
 
-                <h2 className="font-display-lg text-on-surface italic leading-tight mb-4" style={{ fontSize: 28, lineHeight: '34px' }}>
+                <h2 className="font-display-lg text-on-surface italic leading-tight mb-2" style={{ fontSize: 28, lineHeight: '34px' }}>
                   {selectedPin.restaurant_name}
                 </h2>
+
+                {selectedPin.category && (
+                  <div className="mb-4">
+                    <CategoryBadge category={selectedPin.category} />
+                  </div>
+                )}
 
                 {selectedPin.cuisine_tags && selectedPin.cuisine_tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-5">

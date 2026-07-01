@@ -1,6 +1,8 @@
 import { useState, useRef, DragEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Icon as LucideIcon } from 'lucide-react'
 import { mediaApi, pinsApi, type Pin, type PriceRange, type VibeTag } from '@/lib/api'
+import { CATEGORIES, categoryStyle, type CategoryType } from '@/lib/categories'
 import { getAppToken } from '@/lib/auth'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
@@ -60,6 +62,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
   const [restaurantName, setRestaurantName] = useState(pin?.restaurant_name ?? initialName ?? '')
   const [photos, setPhotos] = useState<string[]>(pin?.photos ?? [])
   const [priceRange, setPriceRange] = useState<PriceRange | ''>(pin?.price_range ?? '')
+  const [category, setCategory] = useState<CategoryType | ''>(pin?.category ?? '')
   const [cuisineTags, setCuisineTags] = useState<string[]>(pin?.cuisine_tags ?? [])
   const [rating, setRating] = useState<string>(pin?.rating != null ? String(pin.rating) : '')
   const [uploadingCount, setUploadingCount] = useState(0)
@@ -161,6 +164,7 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
     would_return: wouldReturn || null,
     best_time: bestTime || null,
     best_for: bestFor.length ? bestFor : null,
+    category: category || null,
   })
 
   const submit = useMutation({
@@ -326,6 +330,31 @@ export function PinFormModal({ lat, lng, initialName, pin, onClose, onSuccess }:
                   ))}
                 </div>
                 {priceError && <span className="font-body-sm text-body-sm text-red-400">{priceError}</span>}
+              </div>
+
+              {/* Category */}
+              <div className="flex flex-col gap-2">
+                <span className="font-label-caps text-label-caps text-on-surface-variant">
+                  Category <span className="normal-case text-secondary font-sans font-normal">(sets the pin colour on the map)</span>
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map((c) => {
+                    const { label, iconNode, color } = categoryStyle(c)
+                    const selected = category === c
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCategory(selected ? '' : c)}
+                        className={`${pillBase} inline-flex items-center gap-1.5 ${selected ? 'text-on-primary' : pillInactive}`}
+                        style={selected ? { backgroundColor: color } : undefined}
+                      >
+                        <LucideIcon iconNode={iconNode} size={15} className="shrink-0" />
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Cuisine tags */}

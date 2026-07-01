@@ -1,3 +1,5 @@
+import type { CategoryType } from './categories'
+
 const API_URL = import.meta.env.VITE_API_URL as string
 
 // ---------- Core fetch ----------
@@ -50,6 +52,7 @@ export interface Pin {
   would_return: string | null
   best_time: string | null
   best_for: string[] | null
+  category: CategoryType | null
 }
 
 export interface Influencer {
@@ -89,9 +92,17 @@ export const authApi = {
 
 // ---------- Pins ----------
 
+export interface PinSearchResult extends Pin {
+  influencer_handle: string | null
+  influencer_name: string | null
+}
+
 export const pinsApi = {
   getByInfluencer: (influencerId: string) =>
     apiFetch<Pin[]>(`/pins/influencer/${influencerId}`),
+
+  search: (q: string, token: string) =>
+    apiFetch<PinSearchResult[]>(`/pins/search?q=${encodeURIComponent(q)}`, { token }),
 
   create: (data: Omit<Pin, 'id' | 'influencer_id' | 'created_at'>, token: string) =>
     apiFetch<Pin>('/pins', { method: 'POST', body: JSON.stringify(data), token }),

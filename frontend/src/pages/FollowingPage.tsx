@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAppToken } from '@/lib/auth'
 import { pinsApi, subscriptionsApi, type Influencer } from '@/lib/api'
@@ -12,6 +12,21 @@ export function FollowingPage() {
   const qc = useQueryClient()
   const [selectedInfluencer, setSelectedInfluencer] = useState<Influencer | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // On mobile the browser back button should close the open curator panel
+  // rather than navigating away from this page.
+  const panelOpen = !!selectedInfluencer
+  useEffect(() => {
+    if (!panelOpen) return
+    window.history.pushState({ panel: true }, '')
+    const handlePop = () => setSelectedInfluencer(null)
+    window.addEventListener('popstate', handlePop)
+    return () => {
+      window.removeEventListener('popstate', handlePop)
+      // Panel closed by an in-app button — consume the history entry we pushed.
+      if (window.history.state?.panel) window.history.back()
+    }
+  }, [panelOpen])
 
   const { data: followedInfluencers = [], isLoading } = useQuery({
     queryKey: ['following-influencers'],

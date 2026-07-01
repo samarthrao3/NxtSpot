@@ -1,16 +1,53 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from core.redis import get_redis
 from models import Pin, Subscription, User
 from modules.auth.deps import get_current_user
-from .schemas import PinCreate, PinOut, PinUpdate
+from .schemas import PinCreate, PinOut, PinSearchOut, PinUpdate
 
 router = APIRouter()
+
+
+@router.get("/search", response_model=list[PinSearchOut])
+async def search_pins(
+    q: str = Query(min_length=1, max_length=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[PinSearchOut]:
+    pattern = f"%{q}%"
+    followed_subq = select(Subscription.influencer_id).where(
+        Subscription.user_id == current_user.id
+    )
+    result = await db.execute(
+        select(Pin, User.handle.label("influencer_handle"), User.name.label("influencer_name"))
+        .join(User, Pin.influencer_id == User.id)
+        .where(
+            Pin.influencer_id.in_(followed_subq),
+            or_(
+                Pin.restaurant_name.ilike(pattern),
+                Pin.category.ilike(pattern),
+                Pin.vibe_tag.ilike(pattern),
+                func.array_to_string(Pin.cuisine_tags, ",").ilike(pattern),
+                User.handle.ilike(pattern),
+                User.name.ilike(pattern),
+            ),
+        )
+        .order_by(Pin.created_at.desc())
+        .limit(20)
+    )
+    return [
+        PinSearchOut(
+            **PinOut.model_validate(row.Pin).model_dump(),
+            influencer_handle=row.influencer_handle,
+            influencer_name=row.influencer_name,
+        )
+        for row in result.all()
+    ]
 
 
 @router.get("/influencer/{influencer_id}", response_model=list[PinOut], summary="Public pin list for an influencer")

@@ -27,6 +27,7 @@ class PinWithInfluencer(BaseModel):
     would_return: str | None
     best_time: str | None
     best_for: list[str] | None
+    category: str | None
 
 
 class RestaurantGroup(BaseModel):
