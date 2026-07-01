@@ -16,6 +16,8 @@ export const CATEGORIES = [
   'Fine Dining',
   'Food Truck',
   'Cloud Kitchen',
+  'Fast Food',
+  'Ice Cream',
 ] as const
 
 export type CategoryType = (typeof CATEGORIES)[number]
@@ -75,6 +77,17 @@ const CHEF_HAT: IconNode = [
   ['path', { d: 'M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z', key: '1qvrer' }],
   ['path', { d: 'M6 17h12', key: '1jwigz' }],
 ]
+const HAMBURGER: IconNode = [
+  ['path', { d: 'M12 16H4a2 2 0 1 1 0-4h16a2 2 0 1 1 0 4h-4.25', key: '5dloqd' }],
+  ['path', { d: 'M5 12a2 2 0 0 1-2-2 9 7 0 0 1 18 0 2 2 0 0 1-2 2', key: '1vl3my' }],
+  ['path', { d: 'M5 16a2 2 0 0 0-2 2 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 2 2 0 0 0-2-2q0 0 0 0', key: '1us75o' }],
+  ['path', { d: 'm6.67 12 6.13 4.6a2 2 0 0 0 2.8-.4l3.15-4.2', key: 'qqzweh' }],
+]
+const ICE_CREAM_CONE: IconNode = [
+  ['path', { d: 'm7 11 4.08 10.35a1 1 0 0 0 1.84 0L17 11', key: '1v6356' }],
+  ['path', { d: 'M17 7A5 5 0 0 0 7 7', key: '151p3v' }],
+  ['path', { d: 'M17 7a2 2 0 0 1 0 4H7a2 2 0 0 1 0-4', key: '1sdaij' }],
+]
 
 const CATEGORY_STYLES: Record<CategoryType, CategoryStyle> = {
   'Restaurant': { label: 'Restaurant', color: '#E05A3B', iconNode: UTENSILS },
@@ -85,6 +98,8 @@ const CATEGORY_STYLES: Record<CategoryType, CategoryStyle> = {
   'Fine Dining': { label: 'Fine Dining', color: '#2E8B94', iconNode: WINE },
   'Food Truck': { label: 'Food Truck', color: '#3E9A5C', iconNode: TRUCK },
   'Cloud Kitchen': { label: 'Cloud Kitchen', color: '#5566C0', iconNode: CHEF_HAT },
+  'Fast Food': { label: 'Fast Food', color: '#D9482B', iconNode: HAMBURGER },
+  'Ice Cream': { label: 'Ice Cream', color: '#4FB8C4', iconNode: ICE_CREAM_CONE },
 }
 
 // Fallback for pins created before categories existed (category === null).

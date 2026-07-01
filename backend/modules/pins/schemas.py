@@ -11,7 +11,8 @@ VibeTag = Literal["Casual", "Date Night", "Hidden Gem", "Street Food"]
 PriceRange = Literal["₹", "₹₹", "₹₹₹"]
 CategoryType = Literal[
     "Restaurant", "Cafe", "Pub/Bar", "Street Food",
-    "Bakery/Desserts", "Fine Dining", "Food Truck", "Cloud Kitchen"
+    "Bakery/Desserts", "Fine Dining", "Food Truck", "Cloud Kitchen",
+    "Fast Food", "Ice Cream"
 ]
 
 BBOX = {

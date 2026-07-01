@@ -61,6 +61,7 @@ export function MapPage() {
   const [spottersClosing, setSpottersClosing] = useState(false)
   const [pinPixelPos, setPinPixelPos] = useState<{ x: number; y: number } | null>(null)
   const [detailPanelOpen, setDetailPanelOpen] = useState(false)
+  const [resultsCollapsed, setResultsCollapsed] = useState(false)
 
   const closeSpottersPanel = () => {
     setSpottersClosing(true)
@@ -212,15 +213,18 @@ export function MapPage() {
     e.preventDefault()
     const q = searchInput.trim()
     if (!q) { clearSearch(); return }
+    setResultsCollapsed(true)
     setSubmittedQuery(q)
   }
   const clearSearch = () => {
     setSearchInput('')
     setSubmittedQuery('')
+    setResultsCollapsed(false)
   }
   const handleResultClick = (pin: PinSearchResult) => {
     map.current?.flyTo({ center: [pin.lng, pin.lat], zoom: 16, duration: 1000 })
     setSelectedPin(pin)
+    setResultsCollapsed(true)
   }
 
   const spotterInfluencers = useMemo(() => {
@@ -626,14 +630,26 @@ export function MapPage() {
 
               {isSearching && (
                 <div className="rounded-2xl bg-surface-container-low/95 backdrop-blur-sm border border-outline-variant shadow-lg overflow-hidden flex flex-col max-h-[calc(100dvh-16rem)] md:max-h-[70vh]">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-outline-variant shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setResultsCollapsed((v) => !v)}
+                    className={`flex items-center justify-between px-4 py-2 shrink-0 text-left ${resultsCollapsed ? '' : 'border-b border-outline-variant'}`}
+                    aria-expanded={!resultsCollapsed}
+                  >
                     <span className="font-label-caps text-label-caps text-secondary uppercase">
                       {searchFetching && !searchResults
                         ? 'Searching…'
                         : `${searchResults?.length ?? 0} result${(searchResults?.length ?? 0) === 1 ? '' : 's'}`}
                     </span>
-                    {searchFetching && <Spinner size={4} />}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      {searchFetching && <Spinner size={4} />}
+                      <Icon
+                        name="expand_more"
+                        className={`text-[18px] text-secondary transition-transform ${resultsCollapsed ? '-rotate-90' : ''}`}
+                      />
+                    </div>
+                  </button>
+                  {!resultsCollapsed && (
                   <div className="overflow-y-auto">
                     {searchResults && searchResults.length === 0 && !searchFetching && (
                       <p className="px-4 py-6 font-body-sm text-body-sm text-secondary text-center">
@@ -677,6 +693,7 @@ export function MapPage() {
                       )
                     })}
                   </div>
+                  )}
                 </div>
               )}
             </div>
