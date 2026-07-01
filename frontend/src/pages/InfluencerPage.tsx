@@ -96,7 +96,7 @@ export function InfluencerPage() {
   // Initialise map
   useEffect(() => {
     if (map.current || !mapContainer.current) return
-    map.current = new mapboxgl.Map({
+    const mapOpts: mapboxgl.MapboxOptions & { pixelRatio?: number } = {
       container: mapContainer.current,
       style: MAP_STYLE,
       center: BANGALORE_CENTER,
@@ -105,7 +105,9 @@ export function InfluencerPage() {
       dragRotate: false,
       touchPitch: false,
       fadeDuration: 0,
-    })
+      pixelRatio: Math.min(window.devicePixelRatio, 2),
+    }
+    map.current = new mapboxgl.Map(mapOpts)
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
     map.current.on('style.load', () => {
       map.current?.setConfigProperty('basemap', 'lightPreset', 'night')
@@ -133,7 +135,7 @@ export function InfluencerPage() {
       svg.setAttribute('width', '26')
       svg.setAttribute('height', '34')
       svg.setAttribute('viewBox', '0 0 26 34')
-      svg.style.cssText = 'display:block;filter:drop-shadow(0 2px 10px rgba(255,193,116,0.45));cursor:pointer;'
+      svg.style.cssText = 'display:block;filter:drop-shadow(0 1px 5px rgba(255,193,116,0.4));cursor:pointer;'
       const path = document.createElementNS(ns, 'path')
       path.setAttribute('d', 'M13,2 C7.48,2 3,6.48 3,12 C3,20.5 13,34 13,34 C13,34 23,20.5 23,12 C23,6.48 18.52,2 13,2 Z')
       path.setAttribute('fill', SURFACE)
