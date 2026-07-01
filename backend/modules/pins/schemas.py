@@ -9,6 +9,10 @@ from core.config import settings
 
 VibeTag = Literal["Casual", "Date Night", "Hidden Gem", "Street Food"]
 PriceRange = Literal["₹", "₹₹", "₹₹₹"]
+CategoryType = Literal[
+    "Restaurant", "Cafe", "Pub/Bar", "Street Food",
+    "Bakery/Desserts", "Fine Dining", "Food Truck", "Cloud Kitchen"
+]
 
 BBOX = {
     "lat": (12.834, 13.139),
@@ -49,6 +53,7 @@ class PinCreate(BaseModel):
     would_return: str | None = Field(default=None, max_length=20)
     best_time: str | None = Field(default=None, max_length=40)
     best_for: list[str] | None = Field(default=None, max_length=7)
+    category: CategoryType | None = None
 
     @field_validator("photos")
     @classmethod
@@ -79,6 +84,7 @@ class PinUpdate(BaseModel):
     would_return: str | None = Field(default=None, max_length=20)
     best_time: str | None = Field(default=None, max_length=40)
     best_for: list[str] | None = Field(default=None, max_length=7)
+    category: CategoryType | None = None
 
     @field_validator("photos")
     @classmethod
@@ -116,3 +122,9 @@ class PinOut(BaseModel):
     would_return: str | None
     best_time: str | None
     best_for: list[str] | None
+    category: str | None
+
+
+class PinSearchOut(PinOut):
+    influencer_handle: str | None
+    influencer_name: str | None

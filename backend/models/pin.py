@@ -35,5 +35,6 @@ class Pin(Base):
     would_return: Mapped[str | None] = mapped_column(String(20))
     best_time: Mapped[str | None] = mapped_column(String(40))
     best_for: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    category: Mapped[str | None] = mapped_column(String(50))
 
     influencer: Mapped["User"] = relationship("User", back_populates="pins")  # type: ignore[name-defined]
