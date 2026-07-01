@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
 
 const PRICE_RANGES: PriceRange[] = ['₹', '₹₹', '₹₹₹']
-const CUISINE_TAGS = ['Biryani', 'North Indian', 'South Indian', 'Chinese', 'Continental', 'Street Food', 'Cafe', 'Desserts', 'Seafood', 'Bakery', 'Pizza', 'Beverages'] as const
+const CUISINE_TAGS = ['Biryani', 'North Indian', 'South Indian', 'Chinese', 'Continental', 'Desserts', 'Seafood', 'Pizza', 'Burger', 'Pasta', 'Italian', 'Chaats', 'Healthy'] as const
 const REASONING_OPTIONS = [
   "Best in Bangalore for this cuisine",
   "Unique dish you can't get elsewhere",
