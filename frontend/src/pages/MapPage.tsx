@@ -65,6 +65,7 @@ export function MapPage() {
   const [pinPixelPos, setPinPixelPos] = useState<{ x: number; y: number } | null>(null)
   const [detailPanelOpen, setDetailPanelOpen] = useState(false)
   const [resultsCollapsed, setResultsCollapsed] = useState(false)
+  const [photoIndex, setPhotoIndex] = useState(0)
 
   const closeSpottersPanel = () => {
     setSpottersClosing(true)
@@ -82,6 +83,7 @@ export function MapPage() {
     setSpottersPanelOpen(false)
     setSpottersClosing(false)
     setDetailPanelOpen(false)
+    setPhotoIndex(0)
     if (selectedPin) setHasTappedPin(true)
   }, [selectedPin?.id])
 
@@ -940,12 +942,24 @@ export function MapPage() {
 
               {/* Full-bleed photo hero with floating controls */}
               <div className="relative w-full shrink-0" style={{ height: '42%', minHeight: 200 }}>
-                {selectedPin.photos[0] ? (
-                  <img
-                    src={selectedPin.photos[0]}
-                    alt={selectedPin.restaurant_name}
-                    className="w-full h-full object-cover"
-                  />
+                {selectedPin.photos.length > 0 ? (
+                  <div
+                    className="w-full h-full flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+                    onScroll={(e) => {
+                      const el = e.currentTarget
+                      if (!el.clientWidth) return
+                      setPhotoIndex(Math.round(el.scrollLeft / el.clientWidth))
+                    }}
+                  >
+                    {selectedPin.photos.map((url, i) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt={`${selectedPin.restaurant_name} photo ${i + 1}`}
+                        className="w-full h-full object-cover shrink-0 snap-center"
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="w-full h-full bg-surface-container flex items-center justify-center">
                     <span className="font-display-lg text-on-surface-variant italic opacity-20" style={{ fontSize: 64 }}>
@@ -954,6 +968,16 @@ export function MapPage() {
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-surface to-transparent pointer-events-none" />
+                {selectedPin.photos.length > 1 && (
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pointer-events-none">
+                    {selectedPin.photos.map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 rounded-full transition-all ${i === photoIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                      />
+                    ))}
+                  </div>
+                )}
                 <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 pt-4 pb-6 bg-gradient-to-b from-black/50 to-transparent">
                   <button
                     onClick={() => setSelectedPin(null)}
