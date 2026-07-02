@@ -45,7 +45,7 @@ export function MapPage() {
   const [sideNavOpen, setSideNavOpen] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set())
-  const [curatorsExpanded, setCuratorsExpanded] = useState(true)
+  const [curatorsExpanded, setCuratorsExpanded] = useState(false)
   const [categoriesExpanded, setCategoriesExpanded] = useState(false)
   const [addPinMode, setAddPinMode] = useState(false)
   const [searchInput, setSearchInput] = useState('')
@@ -105,6 +105,13 @@ export function MapPage() {
       if (window.history.state?.detailPanel) window.history.back()
     }
   }, [detailPanelOpen])
+
+  // MapPage no longer unmounts when routing away (see PersistentMapPage), so the
+  // pushState cleanup above won't run just because the user left /map. Close the
+  // panel explicitly so it doesn't linger open — and its history entry — for next time.
+  useEffect(() => {
+    if (location.pathname !== '/map') setDetailPanelOpen(false)
+  }, [location.pathname])
 
   const { data: savedPins } = useQuery({
     queryKey: ['saved-pins'],
@@ -284,6 +291,13 @@ export function MapPage() {
       setMapReady(false)
     }
   }, [])
+
+  // MapPage stays mounted (and display:none'd) while on other routes so switching
+  // back to /map is instant instead of re-initialising Mapbox. The canvas can end up
+  // sized wrong after being hidden, so force a resize whenever this route re-activates.
+  useEffect(() => {
+    if (location.pathname === '/map' && mapReady) map.current?.resize()
+  }, [location.pathname, mapReady])
 
   // Fly to and open details for a pin we were sent here to focus on (e.g. from Saved)
   useEffect(() => {
@@ -837,16 +851,13 @@ export function MapPage() {
                     {selectedPin.price_per_head ?? selectedPin.price_range}
                   </span>
                 )}
-                {selectedPin.vibe_tag && (
-                  <span className="font-label-caps text-label-caps text-on-surface-variant">· {selectedPin.vibe_tag}</span>
+                {(selectedPin.price_range || selectedPin.price_per_head) && selectedAvgRating != null && !selectedPin.photos[0] && (
+                  <span className="font-label-caps text-label-caps text-on-surface-variant">·</span>
                 )}
                 {selectedAvgRating != null && !selectedPin.photos[0] && (
                   <span className="flex items-center gap-0.5 font-label-caps text-label-caps text-on-surface-variant">
-                    · <Icon name="star" filled className="text-[11px] text-primary" /> {selectedAvgRating}
+                    <Icon name="star" filled className="text-[11px] text-primary" /> {selectedAvgRating}
                   </span>
-                )}
-                {selectedPin.would_return && (
-                  <span className="font-label-caps text-label-caps text-secondary">· Returns: {selectedPin.would_return}</span>
                 )}
               </div>
 
