@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
 import { SearchBox } from '@mapbox/search-js-react'
 import { Icon as LucideIcon } from 'lucide-react'
-import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_MAX_BOUNDS, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, MAP_STYLE } from '@/lib/mapbox'
+import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_MAX_BOUNDS, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, mapStyleFor } from '@/lib/mapbox'
 import { feedApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin, type PinSearchResult } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
+import { useTheme } from '@/lib/theme'
 import { useCurrentUser } from '@/lib/useCurrentUser'
 import { colorForId } from '@/lib/colors'
 import { CATEGORIES, categoryStyle } from '@/lib/categories'
@@ -34,6 +35,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
 export function MapPage() {
   const qc = useQueryClient()
   const location = useLocation()
+  const { theme } = useTheme()
+  const themeRef = useRef(theme)
   const focusPin = (location.state as { focusPin?: Pin } | null)?.focusPin
   const lastFocusedId = useRef<string | null>(null)
   const mapContainer = useRef<HTMLDivElement>(null)
@@ -263,7 +266,7 @@ export function MapPage() {
     if (map.current || !mapContainer.current) return
     const mapOpts: mapboxgl.MapboxOptions & { pixelRatio?: number } = {
       container: mapContainer.current,
-      style: MAP_STYLE,
+      style: mapStyleFor(themeRef.current),
       center: BANGALORE_CENTER,
       zoom: BANGALORE_DEFAULT_ZOOM,
       maxBounds: BANGALORE_MAX_BOUNDS,
@@ -275,7 +278,10 @@ export function MapPage() {
     }
     map.current = new mapboxgl.Map(mapOpts)
     map.current.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
+    // Re-fires on every setStyle. The night preset only exists on the Standard
+    // (dark) style — Streets v12 (light) has no `basemap` config, so skip it there.
     map.current.on('style.load', () => {
+      if (themeRef.current !== 'dark') return
       map.current?.setConfigProperty('basemap', 'lightPreset', 'night')
       map.current?.setConfigProperty('basemap', 'show3dObjects', false)
       map.current?.setConfigProperty('basemap', 'colorMotorways', '#42566e')
@@ -291,6 +297,19 @@ export function MapPage() {
       setMapReady(false)
     }
   }, [])
+
+  // Swap the basemap when the theme changes. DOM markers persist across setStyle,
+  // so only the underlying tiles/style are replaced (the style.load handler above
+  // re-applies the dark preset when appropriate). Guard against re-applying the
+  // style the map already loaded at init.
+  const appliedTheme = useRef(theme)
+  useEffect(() => {
+    themeRef.current = theme
+    if (!mapReady || !map.current) return
+    if (appliedTheme.current === theme) return
+    appliedTheme.current = theme
+    map.current.setStyle(mapStyleFor(theme))
+  }, [theme, mapReady])
 
   // MapPage stays mounted (and display:none'd) while on other routes so switching
   // back to /map is instant instead of re-initialising Mapbox. The canvas can end up
@@ -784,12 +803,11 @@ export function MapPage() {
 
           {selectedPin && pinPixelPos && !detailPanelOpen && !mapMoving && (
             <div
-              className="absolute z-40 w-[280px] rounded-2xl overflow-hidden shadow-2xl"
+              className="absolute z-40 w-[280px] rounded-2xl overflow-hidden shadow-2xl bg-surface-container-low/95"
               style={{
                 left: pinPixelPos.x,
                 top: pinPixelPos.y,
                 transform: 'translate(-50%, calc(-100% - 44px))',
-                background: 'rgba(28,27,27,0.95)',
                 backdropFilter: 'blur(6px)',
                 WebkitBackdropFilter: 'blur(6px)',
               }}

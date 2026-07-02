@@ -4,12 +4,15 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import './index.css'
 import { queryClient } from './lib/queryClient'
+import { ThemeProvider } from './lib/theme'
 import { AppRouter } from './router'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AppRouter />
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppRouter />
+      </QueryClientProvider>
+    </ThemeProvider>
   </StrictMode>,
 )
