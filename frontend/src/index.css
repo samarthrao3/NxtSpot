@@ -55,12 +55,12 @@
     --color-on-error-container: 255 218 214;
     --color-ink: 14 14 14;
 
-    /* Mapbox chrome (nav control + popup wrapper) — adapts per theme. */
-    --mapbox-chrome-border: #534434;
-    --mapbox-ctrl-bg: #1c1b1b;
-    --mapbox-ctrl-icon-filter: invert(1);
-    --mapbox-popup-bg: #131313;
-    --mapbox-popup-fg: #e5e2e1;
+    /* Map-adjacent chrome (Mapbox nav control/popup, Google Places dropdown) — adapts per theme. */
+    --map-chrome-border: #534434;
+    --map-ctrl-bg: #1c1b1b;
+    --map-ctrl-icon-filter: invert(1);
+    --map-popup-bg: #131313;
+    --map-popup-fg: #e5e2e1;
   }
 
   /* Light theme — anchored on #fafaf9 backgrounds and #b34d21 terracotta. */
@@ -114,11 +114,11 @@
     --color-on-error-container: 65 14 11;
     --color-ink: 28 25 23;
 
-    --mapbox-chrome-border: #dcd7d0;
-    --mapbox-ctrl-bg: #ffffff;
-    --mapbox-ctrl-icon-filter: none;
-    --mapbox-popup-bg: #fafaf9;
-    --mapbox-popup-fg: #1c1917;
+    --map-chrome-border: #dcd7d0;
+    --map-ctrl-bg: #ffffff;
+    --map-ctrl-icon-filter: none;
+    --map-popup-bg: #fafaf9;
+    --map-popup-fg: #1c1917;
   }
 
   html {
@@ -188,26 +188,60 @@
 .mapboxgl-ctrl-group {
   border-radius: 0 !important;
   box-shadow: none !important;
-  border: 1px solid var(--mapbox-chrome-border) !important;
+  border: 1px solid var(--map-chrome-border) !important;
 }
 .mapboxgl-ctrl-group button {
-  background-color: var(--mapbox-ctrl-bg) !important;
+  background-color: var(--map-ctrl-bg) !important;
 }
 .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
-  filter: var(--mapbox-ctrl-icon-filter);
+  filter: var(--map-ctrl-icon-filter);
 }
 .mapboxgl-ctrl-group button + button {
-  border-top: 1px solid var(--mapbox-chrome-border) !important;
+  border-top: 1px solid var(--map-chrome-border) !important;
 }
 .mapboxgl-popup-content {
   border-radius: 0 !important;
   box-shadow: none !important;
-  border: 1px solid var(--mapbox-chrome-border) !important;
+  border: 1px solid var(--map-chrome-border) !important;
   padding: 0 !important;
-  background-color: var(--mapbox-popup-bg) !important;
-  color: var(--mapbox-popup-fg) !important;
+  background-color: var(--map-popup-bg) !important;
+  color: var(--map-popup-fg) !important;
 }
 .mapboxgl-popup-tip {
+  display: none !important;
+}
+
+/* Google Places Autocomplete dropdown (used by LocationSearchBox) — Google renders
+   this as a plain white box appended to <body>, so it needs explicit theming to
+   match the app instead of Google's default look. */
+.pac-container {
+  background-color: var(--map-popup-bg) !important;
+  border: 1px solid var(--map-chrome-border) !important;
+  border-radius: 12px !important;
+  margin-top: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  font-family: Inter, system-ui, sans-serif !important;
+}
+.pac-item {
+  padding: 8px 12px !important;
+  border-top: 1px solid var(--map-chrome-border) !important;
+  color: var(--map-popup-fg) !important;
+  cursor: pointer;
+}
+.pac-item:first-child {
+  border-top: none !important;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background-color: rgb(var(--color-surface-container-high)) !important;
+}
+.pac-item-query {
+  color: var(--map-popup-fg) !important;
+}
+.pac-matched {
+  color: rgb(var(--color-primary)) !important;
+}
+.pac-icon {
   display: none !important;
 }
 
