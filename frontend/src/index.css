@@ -3,6 +3,124 @@
 @tailwind utilities;
 
 @layer base {
+  /* Dark theme (default). Values are RGB channels consumed by the Tailwind
+     color tokens via rgb(var(--color-x) / <alpha-value>). */
+  :root {
+    --color-background: 19 19 19;
+    --color-on-background: 229 226 225;
+    --color-surface: 19 19 19;
+    --color-surface-dim: 19 19 19;
+    --color-surface-bright: 57 57 57;
+    --color-surface-container-lowest: 14 14 14;
+    --color-surface-container-low: 28 27 27;
+    --color-surface-container: 32 31 31;
+    --color-surface-container-high: 42 42 42;
+    --color-surface-container-highest: 53 53 52;
+    --color-surface-variant: 53 53 52;
+    --color-surface-tint: 255 185 95;
+    --color-on-surface: 229 226 225;
+    --color-on-surface-variant: 216 195 173;
+    --color-inverse-surface: 229 226 225;
+    --color-inverse-on-surface: 49 48 48;
+    --color-outline: 160 142 122;
+    --color-outline-variant: 83 68 52;
+    --color-primary: 255 193 116;
+    --color-on-primary: 71 42 0;
+    --color-primary-container: 245 158 11;
+    --color-on-primary-container: 97 59 0;
+    --color-inverse-primary: 133 83 0;
+    --color-primary-fixed: 255 221 184;
+    --color-primary-fixed-dim: 255 185 95;
+    --color-on-primary-fixed: 42 23 0;
+    --color-on-primary-fixed-variant: 101 62 0;
+    --color-secondary: 255 183 125;
+    --color-on-secondary: 77 38 0;
+    --color-secondary-container: 217 119 7;
+    --color-on-secondary-container: 67 33 0;
+    --color-secondary-fixed: 255 220 195;
+    --color-secondary-fixed-dim: 255 183 125;
+    --color-on-secondary-fixed: 47 21 0;
+    --color-on-secondary-fixed-variant: 110 57 0;
+    --color-tertiary: 255 190 160;
+    --color-on-tertiary: 86 31 0;
+    --color-tertiary-container: 247 154 108;
+    --color-on-tertiary-container: 114 48 10;
+    --color-tertiary-fixed: 255 219 204;
+    --color-tertiary-fixed-dim: 255 182 147;
+    --color-on-tertiary-fixed: 53 16 0;
+    --color-on-tertiary-fixed-variant: 118 51 13;
+    --color-error: 255 180 171;
+    --color-on-error: 105 0 5;
+    --color-error-container: 147 0 10;
+    --color-on-error-container: 255 218 214;
+    --color-ink: 14 14 14;
+
+    /* Mapbox chrome (nav control + popup wrapper) — adapts per theme. */
+    --mapbox-chrome-border: #534434;
+    --mapbox-ctrl-bg: #1c1b1b;
+    --mapbox-ctrl-icon-filter: invert(1);
+    --mapbox-popup-bg: #131313;
+    --mapbox-popup-fg: #e5e2e1;
+  }
+
+  /* Light theme — anchored on #fafaf9 backgrounds and #b34d21 terracotta. */
+  .theme-light {
+    --color-background: 250 250 249;
+    --color-on-background: 28 25 23;
+    --color-surface: 250 250 249;
+    --color-surface-dim: 240 239 236;
+    --color-surface-bright: 255 255 255;
+    --color-surface-container-lowest: 255 255 255;
+    --color-surface-container-low: 244 243 241;
+    --color-surface-container: 238 236 233;
+    --color-surface-container-high: 231 229 225;
+    --color-surface-container-highest: 224 221 216;
+    --color-surface-variant: 224 221 216;
+    --color-surface-tint: 179 77 33;
+    --color-on-surface: 28 25 23;
+    --color-on-surface-variant: 87 83 78;
+    --color-inverse-surface: 41 37 36;
+    --color-inverse-on-surface: 250 250 249;
+    --color-outline: 121 113 107;
+    --color-outline-variant: 220 215 208;
+    --color-primary: 179 77 33;
+    --color-on-primary: 255 255 255;
+    --color-primary-container: 151 64 27;
+    --color-on-primary-container: 255 255 255;
+    --color-inverse-primary: 224 145 95;
+    --color-primary-fixed: 242 216 202;
+    --color-primary-fixed-dim: 179 77 33;
+    --color-on-primary-fixed: 61 26 11;
+    --color-on-primary-fixed-variant: 125 53 23;
+    --color-secondary: 161 84 47;
+    --color-on-secondary: 255 255 255;
+    --color-secondary-container: 179 77 33;
+    --color-on-secondary-container: 255 255 255;
+    --color-secondary-fixed: 242 216 202;
+    --color-secondary-fixed-dim: 161 84 47;
+    --color-on-secondary-fixed: 61 26 11;
+    --color-on-secondary-fixed-variant: 125 53 23;
+    --color-tertiary: 179 77 33;
+    --color-on-tertiary: 255 255 255;
+    --color-tertiary-container: 201 106 63;
+    --color-on-tertiary-container: 255 255 255;
+    --color-tertiary-fixed: 242 216 202;
+    --color-tertiary-fixed-dim: 207 122 82;
+    --color-on-tertiary-fixed: 61 26 11;
+    --color-on-tertiary-fixed-variant: 125 53 23;
+    --color-error: 179 38 30;
+    --color-on-error: 255 255 255;
+    --color-error-container: 249 222 220;
+    --color-on-error-container: 65 14 11;
+    --color-ink: 28 25 23;
+
+    --mapbox-chrome-border: #dcd7d0;
+    --mapbox-ctrl-bg: #ffffff;
+    --mapbox-ctrl-icon-filter: none;
+    --mapbox-popup-bg: #fafaf9;
+    --mapbox-popup-fg: #1c1917;
+  }
+
   html {
     @apply bg-background text-on-surface font-sans antialiased;
     -webkit-tap-highlight-color: transparent;
@@ -65,28 +183,29 @@
   }
 }
 
-/* Flatten Mapbox's default rounded/shadowed controls to match the editorial dark design */
+/* Flatten Mapbox's default rounded/shadowed controls to match the editorial design.
+   Colours come from theme variables so the chrome tracks dark/light mode. */
 .mapboxgl-ctrl-group {
   border-radius: 0 !important;
   box-shadow: none !important;
-  border: 1px solid #534434 !important;
+  border: 1px solid var(--mapbox-chrome-border) !important;
 }
 .mapboxgl-ctrl-group button {
-  background-color: #1c1b1b !important;
+  background-color: var(--mapbox-ctrl-bg) !important;
 }
 .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
-  filter: invert(1);
+  filter: var(--mapbox-ctrl-icon-filter);
 }
 .mapboxgl-ctrl-group button + button {
-  border-top: 1px solid #534434 !important;
+  border-top: 1px solid var(--mapbox-chrome-border) !important;
 }
 .mapboxgl-popup-content {
   border-radius: 0 !important;
   box-shadow: none !important;
-  border: 1px solid #534434 !important;
+  border: 1px solid var(--mapbox-chrome-border) !important;
   padding: 0 !important;
-  background-color: #131313 !important;
-  color: #e5e2e1 !important;
+  background-color: var(--mapbox-popup-bg) !important;
+  color: var(--mapbox-popup-fg) !important;
 }
 .mapboxgl-popup-tip {
   display: none !important;

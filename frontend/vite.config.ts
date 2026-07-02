@@ -33,6 +33,39 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
+          // Mapbox style documents change rarely — serve from cache, refresh in the
+          // background so a basemap update self-heals on the next load. Must be listed
+          // before the broad api.mapbox.com rule below (Workbox uses the first match).
+          {
+            urlPattern: /^https:\/\/api\.mapbox\.com\/styles\/v1\/[^/]+\/[^/]+(?:$|\?)/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'mapbox-styles',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Sprites, glyphs (fonts), and vector tiles — immutable enough to cache
+          // aggressively so switching themes / revisiting never re-hits the network.
+          // Telemetry lives on events.mapbox.com (a POST) and is intentionally not matched.
+          {
+            urlPattern: /^https:\/\/api\.mapbox\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mapbox-assets',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/[abcd]\.tiles\.mapbox\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mapbox-tiles',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'StaleWhileRevalidate',

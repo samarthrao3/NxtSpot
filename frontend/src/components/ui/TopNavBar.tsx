@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useSession } from '@/lib/useSession'
+import { useTheme } from '@/lib/theme'
 import { authApi } from '@/lib/api'
 import { getAppToken } from '@/lib/auth'
 import { Icon } from './Icon'
@@ -18,6 +19,7 @@ export function TopNavBar() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const session = useSession()
+  const { theme, toggleTheme } = useTheme()
   const user = session?.user
   const { data: profile } = useQuery({
     queryKey: ['me'],
@@ -74,6 +76,14 @@ export function TopNavBar() {
       )}
 
       <div className="ml-auto flex items-center gap-3 md:gap-4 shrink-0">
+        <button
+          onClick={toggleTheme}
+          className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0"
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          <Icon name={theme === 'dark' ? 'light_mode' : 'dark_mode'} className="text-[18px]" />
+        </button>
         {user ? (
           <div className="relative" ref={menuRef}>
             <button
