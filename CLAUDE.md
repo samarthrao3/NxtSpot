@@ -204,6 +204,7 @@ JWT_SECRET=
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_MAPBOX_TOKEN=
+VITE_GOOGLE_PLACES_API_KEY=   # Google Maps Platform key with the Places API enabled — used only for the add-pin location search
 VITE_API_URL=http://localhost:8000
 ```
 

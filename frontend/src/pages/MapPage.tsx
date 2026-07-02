@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import mapboxgl from 'mapbox-gl'
-import { SearchBox } from '@mapbox/search-js-react'
 import { Icon as LucideIcon } from 'lucide-react'
 import { MAPBOX_TOKEN, BANGALORE_BBOX, BANGALORE_MAX_BOUNDS, BANGALORE_CENTER, BANGALORE_DEFAULT_ZOOM, mapStyleFor } from '@/lib/mapbox'
 import { feedApi, pinsApi, savedPinsApi, subscriptionsApi, type Pin, type PinSearchResult } from '@/lib/api'
@@ -13,6 +12,7 @@ import { colorForId } from '@/lib/colors'
 import { CATEGORIES, categoryStyle } from '@/lib/categories'
 import { createPinMarkerElement } from '@/lib/markers'
 import { CategoryBadge } from '@/components/pins/CategoryBadge'
+import { LocationSearchBox } from '@/components/map/LocationSearchBox'
 import { TopNavBar } from '@/components/ui/TopNavBar'
 import { SideNavBar } from '@/components/ui/SideNavBar'
 import { BottomNavBar } from '@/components/ui/BottomNavBar'
@@ -732,22 +732,12 @@ export function MapPage() {
             </div>
           )}
 
-          {addPinMode && mapReady && map.current && (
+          {addPinMode && (
             <div className="absolute top-4 left-16 z-30 w-72">
-              <SearchBox
-                accessToken={MAPBOX_TOKEN}
-                map={map.current}
-                mapboxgl={mapboxgl}
-                options={{
-                  bbox: [BANGALORE_BBOX.lng.min, BANGALORE_BBOX.lat.min, BANGALORE_BBOX.lng.max, BANGALORE_BBOX.lat.max],
-                  proximity: BANGALORE_CENTER,
-                }}
-                placeholder="Search for a location in Bangalore"
-                onRetrieve={(res) => {
-                  const feature = res.features[0]
-                  if (!feature) return
-                  const { latitude, longitude } = feature.properties.coordinates
-                  tryPlaceLocation(latitude, longitude, feature.properties.name)
+              <LocationSearchBox
+                onSelect={(lat, lng, name) => {
+                  map.current?.flyTo({ center: [lng, lat], zoom: 16, duration: 1000 })
+                  tryPlaceLocation(lat, lng, name)
                 }}
               />
             </div>
